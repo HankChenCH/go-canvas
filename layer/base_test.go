@@ -1,7 +1,8 @@
 package layer_test
 
-// AbstractLayerTest 平移:Go 无匿名子类,基类用例经图片图层承载(图片图层默认 center/center,
-// 基类本身默认 left/top,待工单 02 文本图层落地后由其补齐 left/top 断言)。
+// AbstractLayerTest 平移:Go 无匿名子类,基类用例经图片图层承载(图片图层默认 center/center;
+// 文本图层落地后其水平 left 默认与垂直 bottom 覆写在 text_test.go 断言,基类垂直 top
+// 默认待工单 03 表格图层落地后补齐)。
 // 两个 PHP 用例不平移:
 //   - testWidthHeightCastToInt('30'→30):字符串 setter 面属 Go 类型系统替代范围(spec Out of Scope);
 //   - testSettersAreFluent:fluent 链已被 functional options 替代(DESIGN.md「有意偏离」#4)。

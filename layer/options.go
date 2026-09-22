@@ -1,5 +1,9 @@
 package layer
 
+import (
+	"github.com/hankchen/go-canvas/text"
+)
+
 // 选项机制:Go 无继承,公共设定与图层专属设定经"接口分隔"达成编译期类型安全——
 // 公共选项施加到嵌入的 base,图层专属选项施加到具体图层;错配的选项(如给文本图层
 // 传 WithImage)过不了编译。新增图层类型时补一行 baseOpt 的 apply 适配即可。
@@ -8,6 +12,7 @@ package layer
 type baseOpt func(*base)
 
 func (f baseOpt) applyImage(l *ImageLayer) { f(&l.base) }
+func (f baseOpt) applyText(l *TextLayer)   { f(&l.base) }
 
 // imageOpt 图片图层专属选项
 type imageOpt func(*ImageLayer)
@@ -16,6 +21,14 @@ func (f imageOpt) applyImage(l *ImageLayer) { f(l) }
 
 // imageLayerOpt 图片图层构造选项(公共 + 图片专属)
 type imageLayerOpt interface{ applyImage(*ImageLayer) }
+
+// textOpt 文本图层专属选项
+type textOpt func(*TextLayer)
+
+func (f textOpt) applyText(l *TextLayer) { f(l) }
+
+// textLayerOpt 文本图层构造选项(公共 + 文本专属)
+type textLayerOpt interface{ applyText(*TextLayer) }
 
 // WithSize 声明尺寸;会清除 auto 标志
 func WithSize(width, height int) baseOpt {
@@ -121,4 +134,36 @@ func borderColor(color []string) string {
 		return color[0]
 	}
 	return DefaultBorderColor
+}
+
+// WithText 文本内容(PHP setText 的选项形态)
+func WithText(text string) textOpt {
+	return func(l *TextLayer) { l.text = text }
+}
+
+// WithFont 字体设定:字体文件路径/URL + 字号 + 颜色(PHP setFont 的选项形态);
+// 空串或纯数字字体 = 渲染端内置默认字体语义,并清空已物化结果
+func WithFont(font string, fontSize int, fontColor string) textOpt {
+	return func(l *TextLayer) { l.setFont(font, fontSize, fontColor) }
+}
+
+// WithAutowrap 是否按内容盒宽自动断行
+func WithAutowrap(autowrap bool) textOpt {
+	return func(l *TextLayer) { l.autowrap = autowrap }
+}
+
+// WithAngle 文本旋转角度
+func WithAngle(angle int) textOpt {
+	return func(l *TextLayer) { l.textAngle = angle }
+}
+
+// WithLineBreaker 覆写默认断行器(Canvas 级统一切换断行策略时使用,
+// 保证多个渲染端拿到同一排版结果)
+func WithLineBreaker(breaker text.LineBreaker) textOpt {
+	return func(l *TextLayer) { l.lineBreaker = breaker }
+}
+
+// WithMeasurerFactory 覆写默认度量器工厂(Canvas 级统一切换度量策略时使用)
+func WithMeasurerFactory(factory text.MeasurerFactory) textOpt {
+	return func(l *TextLayer) { l.measurerFactory = factory }
 }

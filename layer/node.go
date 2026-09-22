@@ -15,11 +15,23 @@ type Node struct {
 	Data     *Data  `json:"data,omitempty"`
 }
 
-// Spec 图层公共规格:形状 / 对齐 / 定位
+// Spec 图层公共规格:形状 / 对齐 / 定位;文本图层追加 fontFamily 键
+// (PHP TextLayer::graph() 在父类 spec 之后写入,键序 shape/align/position/fontFamily)
 type Spec struct {
-	Shape    Shape    `json:"shape"`
-	Align    Align    `json:"align"`
-	Position Position `json:"position"`
+	Shape      Shape       `json:"shape"`
+	Align      Align       `json:"align"`
+	Position   Position    `json:"position"`
+	FontFamily *FontFamily `json:"fontFamily,omitempty"`
+}
+
+// FontFamily 文本字体规格(wire 面仅文本图层携带)。
+// font 保留完整原始值(路径/URL),与 PHP 一致不做 basename 截断
+type FontFamily struct {
+	Font      string `json:"font"`
+	FontSize  int    `json:"fontSize"`
+	FontColor string `json:"fontColor"`
+	Angle     int    `json:"angle"`
+	Autowrap  bool   `json:"autowrap"`
 }
 
 // Shape 盒模型:尺寸、auto 标志、行高倍数、内边距、边框、背景色
@@ -70,8 +82,10 @@ type Position struct {
 }
 
 // Data 图层业务数据。图片图层仅 valueType/value 两键——无 expression 预留键,
-// 与 PHP 字节面一致;expression 占位属文本/二维码图层(工单 02)。
+// 与 PHP 字节面一致;文本/二维码图层恒写 expression 空串占位(表达式引擎不存在,
+// 仅保留 wire 字段,PHP 同款)
 type Data struct {
-	ValueType string  `json:"valueType"`
-	Value     *string `json:"value"`
+	ValueType  string  `json:"valueType"`
+	Expression *string `json:"expression,omitempty"`
+	Value      *string `json:"value"`
 }

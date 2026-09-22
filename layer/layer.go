@@ -9,10 +9,12 @@ import (
 )
 
 // 图层类型标识(graph.type):与 PHP 类名常量同名,跨端固定。
-// 文本/二维码/表格类型属工单 02/03,落地时在此追加。
+// 二维码/表格类型属工单 03,落地时在此追加。
 const (
 	// TypeImage 图片图层
 	TypeImage = "ImageLayer"
+	// TypeText 文本图层
+	TypeText = "TextLayer"
 )
 
 // ErrUnknownLayerType graph 解码遇未知图层类型(消息含类型名)
@@ -33,6 +35,8 @@ func FromGraph(n Node) (Layer, error) {
 	switch n.Type {
 	case TypeImage:
 		return ImageFromGraph(n), nil
+	case TypeText:
+		return TextFromGraph(n), nil
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnknownLayerType, n.Type)
 	}
