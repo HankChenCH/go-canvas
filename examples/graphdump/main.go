@@ -24,7 +24,7 @@ func main() {
 			layer.WithSize(1000, 200),
 			layer.WithAutoHeight(),
 			layer.WithLineHeight(1.5),
-			layer.WithPaddingHV(40, 24),
+			layer.WithPaddingVH(24, 40),
 			layer.WithBorderTop(2, "#333333"),
 			layer.WithBackground("#ffffff"),
 			layer.WithPosition(40, 1600, layer.AnchorBottomLeft),

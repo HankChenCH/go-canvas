@@ -52,7 +52,7 @@ func TestDefaultState(t *testing.T) {
 
 func TestContentSizeSubtractsPadding(t *testing.T) {
 	// PHP AbstractLayerTest::testContentSizeSubtractsPadding
-	l := layer.NewImageLayer(layer.WithSize(100, 50), layer.WithPaddingHV(20, 10))
+	l := layer.NewImageLayer(layer.WithSize(100, 50), layer.WithPaddingVH(10, 20))
 
 	if got := l.ContentWidth(); got != 60 {
 		t.Errorf("ContentWidth = %d, want 60", got)
@@ -71,7 +71,7 @@ func TestPaddingCssStyles(t *testing.T) {
 	}{
 		{"1 值全边", layer.NewImageLayer(layer.WithPadding(1)).Padding(),
 			layer.Padding{Top: 1, Bottom: 1, Left: 1, Right: 1}},
-		{"2 值上下/左右", layer.NewImageLayer(layer.WithPaddingHV(2, 1)).Padding(),
+		{"2 值上下/左右", layer.NewImageLayer(layer.WithPaddingVH(1, 2)).Padding(),
 			layer.Padding{Top: 1, Bottom: 1, Left: 2, Right: 2}},
 		{"3 值上/左右/下", layer.NewImageLayer(layer.WithPaddingTHB(1, 2, 3)).Padding(),
 			layer.Padding{Top: 1, Bottom: 3, Left: 2, Right: 2}},
@@ -161,7 +161,7 @@ func TestGraphRoundtripBase(t *testing.T) {
 	// PHP AbstractLayerTest::testFromGraphRoundtripBase:graph → JSON → 解码 → 重建 → graph 恒等
 	l := layer.NewImageLayer(
 		layer.WithSize(30, 40),
-		layer.WithPaddingHV(2, 1),
+		layer.WithPaddingVH(1, 2),
 		layer.WithBorder(2, "#123456"),
 		layer.WithPosition(3, 4, "bottom-center"),
 		layer.WithPriority(7),

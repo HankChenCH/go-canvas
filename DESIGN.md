@@ -45,6 +45,8 @@
 2. 缓存：`os.UserCacheDir()/go-canvas/` + sha256(完整 URL) 键——PHP 的 basename 键有同名碰撞，属旧债不继承；缓存不在互通契约面。
 3. GD 基线魔数不移植（ADR-0003）。
 4. 图层 setter 的 fluent 链改为 functional options；隐藏行为（border width=0 清除等）落在 option/方法构造器里。
+5. 背景空串语义：`WithBackground("")` 归 null（等价 PHP `setBackground(null)` 清除）；PHP 传 `''` 存空串的行为不复刻（Go 无 null 字符串字面）。wire 解码侧指针直传，`""` 与 null 照常区分，往返与互通不受影响。
+6. padding 双值选项 `WithPaddingVH(vertical, horizontal)` 取 CSS/PHP 首参垂直序（PHP `setPadding(1,2)` 上下=1、左右=2）。
 
 ## 验收与测试
 

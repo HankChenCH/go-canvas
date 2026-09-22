@@ -57,7 +57,7 @@ func (l *ImageLayer) TypeName() string { return TypeImage }
 
 // Graph 序列化为 wire 节点;data 仅 valueType/value 两键(无 expression 预留键)
 func (l *ImageLayer) Graph() Node {
-	n := l.base.node(TypeImage)
+	n := l.base.wireNode(TypeImage)
 	n.Data = &Data{ValueType: ValueTypeStatic, Value: l.rawImg}
 	return n
 }

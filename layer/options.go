@@ -100,8 +100,9 @@ func WithPadding(v float64) baseOpt {
 	return func(b *base) { b.setPaddingAll(v) }
 }
 
-// WithPaddingHV 内边距,CSS 2 值语义:上下 vertical / 左右 horizontal
-func WithPaddingHV(horizontal, vertical float64) baseOpt {
+// WithPaddingVH 内边距,CSS 2 值语义:垂直(上下)在前 / 水平(左右)在后,
+// 与 PHP setPadding(1,2) 的首参垂直一致
+func WithPaddingVH(vertical, horizontal float64) baseOpt {
 	return func(b *base) { b.setPaddingHV(horizontal, vertical) }
 }
 

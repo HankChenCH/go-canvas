@@ -142,8 +142,8 @@ func (b *base) Position() (string, int, int) {
 
 // ---- graph 构造与回放 ----
 
-// node 以 typ 为类型标识生成 wire 节点的公共部分(对应 PHP AbstractLayer::graph)
-func (b *base) node(typ string) Node {
+// wireNode 以 typ 为类型标识生成 wire 节点的公共部分(对应 PHP AbstractLayer::graph)
+func (b *base) wireNode(typ string) Node {
 	return Node{
 		Type:     typ,
 		Priority: b.priority,
