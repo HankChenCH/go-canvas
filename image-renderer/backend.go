@@ -1,7 +1,8 @@
 // Package imagerenderer 核心包的位图渲染后端:以标准库 image 新建透明位图为
 // 渲染面,实现五个绘制原语接入渲染模板;承载 PNG/JPEG 解码、EXIF 转正、
-// cover 缩放裁切、文本绘制(opentype 字体 + 内置默认字体兜底)与 PNG 编码
-// 落盘。对应 PHP 侧的 php-canvas-image-renderer 包,End 产物为 *image.NRGBA。
+// cover 缩放裁切、文本绘制(opentype 字体 + 内置默认字体兜底)、二维码物化
+// (go-qrcode 适配,QRMaterializer 缝的默认接线)与 PNG 编码落盘。对应 PHP 侧
+// 的 php-canvas-image-renderer 包,End 产物为 *image.NRGBA。
 package imagerenderer
 
 import (

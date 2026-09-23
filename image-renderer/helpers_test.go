@@ -16,6 +16,7 @@ var (
 	green = color.NRGBA{R: 0x00, G: 0xFF, B: 0x00, A: 0xFF}
 	blue  = color.NRGBA{R: 0x00, G: 0x00, B: 0xFF, A: 0xFF}
 	white = color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
+	black = color.NRGBA{A: 0xFF}
 
 	// clear 透明色(新建渲染面的初始态)
 	clear = color.NRGBA{}

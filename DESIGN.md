@@ -35,7 +35,7 @@
 
 - priority 越大越先渲染（越垫底）；排序稳定（对齐 PHP 8.0+ usort）。
 - 默认值逐字段对齐：TextLayer 垂直 bottom、ImageLayer center/center，其余 left/top。
-- QR 固定选项：ECC=High、margin=0、roundBlockSizeMode=None、黑白双色、按宽度正方形铺放。
+- QR 固定选项（M2 落地于 `image-renderer/qr.go`，yeqown/go-qrcode v2 适配）：ECC=High（yeqown 常量名为 Highest）、margin=0、黑白双色、按宽度正方形铺放；编码模式复刻 bacon chooseMode 的数字/字母数字/字节三分、永不 Kanji（库自带 EncModeAuto 会为纯中日文选 Kanji，与 endroid 传 UTF-8 的语义相悖）；出图尺寸按整数块宽向下量化（endroid None 模式为精确 size 像素），渲染原语 cover 缩放铺放后不可见，只影响缓存 PNG 的绝对尺寸。
 - 容器 add 副作用一次性同步（与 PHP 一致，先 add 后改尺寸不重算）。
 - graph 往返恒等；type 常量与 PHP 同名（`TextLayer` 等）；json tag 逐字段对齐 PHP 键名（含 `spec.fontFamily` 这个字面键）。
 - 数值语义：布局全程整型、向零截断（与 PHP intval 一致）；PHP setter 面的数字字符串宽容性不复刻（Go 无 setter 面）。
@@ -48,6 +48,7 @@
 4. 图层 setter 的 fluent 链改为 functional options；隐藏行为（border width=0 清除等）落在 option/方法构造器里。
 5. 背景空串语义：`WithBackground("")` 归 null（等价 PHP `setBackground(null)` 清除）；PHP 传 `''` 存空串的行为不复刻（Go 无 null 字符串字面）。wire 解码侧指针直传，`""` 与 null 照常区分，往返与互通不受影响。
 6. padding 双值选项 `WithPaddingVH(vertical, horizontal)` 取 CSS/PHP 首参垂直序（PHP `setPadding(1,2)` 上下=1、左右=2）。
+7. QR 出图尺寸为整数块宽向下量化（yeqown `WithQRWidth` 语义），非 endroid None 模式的精确 size 像素；块宽受形参 uint8 所限钳到 ≤255（超宽目标出图远小于目标宽），目标宽小于矩阵边长时出图反大于目标宽而不错误中止（endroid 同场景抛 BlockSizeTooSmallException）——渲染端按宽正方形 cover 缩放使两者在渲染面等价（工单 08）。
 
 ## 验收与测试
 
