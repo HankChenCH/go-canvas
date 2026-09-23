@@ -15,7 +15,7 @@ else
 endif
 endif
 
-.PHONY: test vet layout-snapshot
+.PHONY: test vet layout-snapshot visual-check
 
 test:
 	go test ./...
@@ -28,3 +28,8 @@ vet:
 layout-snapshot:
 	$(PHP) ../php-canvas-next/scripts/export-layout-snapshot.php renderer/testdata/layout-snapshot.json
 	@echo "快照已更新:人审 git diff(diff 即双端布局行为 diff)后随代码一并提交"
+
+# 目验脚本:渲染综合样图供人工目验(工单 11,用法与目验要点见 docs/visual-check.md);
+# 缺省产物 image-renderer/visual-check.png(已 gitignore),可传 OUTPUT= 覆写
+visual-check:
+	cd image-renderer && go run ./cmd/visualcheck $(OUTPUT)

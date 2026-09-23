@@ -54,10 +54,10 @@
 
 - 结构侧：phpunit 用例平移为 Go 表驱动测试（排序稳定性、graph 快照与往返、断行 12 例、度量 4 例、锚点 9 位 + 负溢出、Resolver 缓存行为）。
 - 布局快照 fixture 轨（M3）：PHP 导出脚本产出"断行行数 + 行内容 + 锚点坐标"JSON 进仓库，Go 断言；PHP 导出走 Makefile 人工触发，不进 Go CI。文本 y 为预期差异字段。（工单 10 已落地，契约与再生成流程见 docs/layout-snapshot.md）
-- 渲染侧（M2）：像素属性断言（点位取样）+ golden 容差，不做逐像素复刻；平移 visual-check 目验脚本。
+- 渲染侧（M2）：像素属性断言（点位取样）+ golden 容差，不做逐像素复刻；平移 visual-check 目验脚本。（工单 11 已落地：`make visual-check` 渲染综合样图供人工目验，用法、字体候选与双端对照口径见 docs/visual-check.md）
 
 ## 交付节奏
 
 - M1（本 module）：结构 + graph 序列化 + 布局 + 文本契约 + 对齐版默认实现。
 - M2：渲染后端 module（五原语 + 文本绘制 + QR 物化 + 像素属性断言）。
-- M3：增强实现（真实度量 + segmenter 断行 + UAX #29 字素）+ 布局快照 fixture + 目验脚本。
+- M3：增强实现（真实度量 + segmenter 断行 + UAX #29 字素）+ 布局快照 fixture + 目验脚本。（fixture 与目验脚本已分别随工单 10/11 提前落地）
