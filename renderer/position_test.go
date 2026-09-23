@@ -30,7 +30,7 @@ func testNineAnchors(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		x, y := renderer.Resolve(tc.anchor, 100, 80, 20, 10)
+		x, y := renderer.ResolveAnchor(tc.anchor, 100, 80, 20, 10)
 		if x != tc.wantX || y != tc.wantY {
 			t.Errorf("锚点 %s 偏移不符: got (%d, %d), want (%d, %d)", tc.anchor, x, y, tc.wantX, tc.wantY)
 		}
@@ -42,7 +42,7 @@ func testNineAnchors(t *testing.T) {
 func testChildLargerThanParentAllowsNegativeOverflow(t *testing.T) {
 	t.Helper()
 
-	x, y := renderer.Resolve("bottom-right", 10, 10, 50, 50)
+	x, y := renderer.ResolveAnchor("bottom-right", 10, 10, 50, 50)
 	if x != -40 || y != -40 {
 		t.Errorf("负溢出偏移不符: got (%d, %d), want (-40, -40)", x, y)
 	}

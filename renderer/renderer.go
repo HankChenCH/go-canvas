@@ -92,7 +92,7 @@ func (r *template) paint(l layer.Layer, originX, originY, parentWidth, parentHei
 	}
 
 	anchor, x, y := p.Position()
-	anchorX, anchorY := Resolve(anchor, parentWidth, parentHeight, p.Width(), p.Height())
+	anchorX, anchorY := ResolveAnchor(anchor, parentWidth, parentHeight, p.Width(), p.Height())
 
 	absX := originX + anchorX + x
 	absY := originY + anchorY + y
