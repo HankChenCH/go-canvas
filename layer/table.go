@@ -153,7 +153,7 @@ type contentLayer interface {
 // TableCellLayer 表格单元格图层:包装一个内容层
 type TableCellLayer struct {
 	base
-	contentLayer Layer
+	content Layer
 }
 
 // NewTableCellLayer 构造表格单元格图层
@@ -176,11 +176,11 @@ func (l *TableCellLayer) AddContentLayer(content contentLayer) {
 	} else {
 		content.setHeight(l.Height())
 	}
-	l.contentLayer = content
+	l.content = content
 }
 
 // ContentLayer 包装的内容层;未包装为 nil
-func (l *TableCellLayer) ContentLayer() Layer { return l.contentLayer }
+func (l *TableCellLayer) ContentLayer() Layer { return l.content }
 
 // TypeName implements Layer
 func (l *TableCellLayer) TypeName() string { return TypeTableCell }
@@ -189,8 +189,8 @@ func (l *TableCellLayer) TypeName() string { return TypeTableCell }
 // Content 以 RawMessage 承载,往返按字节原样保留
 func (l *TableCellLayer) Graph() Node {
 	n := l.base.wireNode(TypeTableCell)
-	if l.contentLayer != nil {
-		n.Content = marshalNode(l.contentLayer.Graph())
+	if l.content != nil {
+		n.Content = marshalNode(l.content.Graph())
 	} else {
 		n.Content = json.RawMessage("null")
 	}

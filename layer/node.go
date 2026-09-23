@@ -10,8 +10,9 @@ const ValueTypeStatic = "StaticValue"
 
 // Node 图层在 graph 中的 wire 节点。类型专属键仅由对应图层类型写出:
 // data 属图片/文本/二维码图层,rows/cells/content 属对应表格容器——
-// 非 nil 才写出(空容器也恒写键,见各容器 Graph);Content 以 RawMessage
-// 承载以区分"键存在为 null"(空单元格)与"键缺省"(非容器)。
+// 非 nil 才写出(空容器也恒写键,见各容器 Graph)。rows/cells 用指针切片表达
+// "键存在且为空数组";content 的"键存在且为 null"是 *Node 配合 omitempty 表达
+// 不了的(nil 即缺键),故以 RawMessage 承载,顺带按字节原样保留嵌套载荷。
 type Node struct {
 	Type     string          `json:"type"`
 	Priority int             `json:"priority"`
