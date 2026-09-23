@@ -53,7 +53,7 @@
 ## 验收与测试
 
 - 结构侧：phpunit 用例平移为 Go 表驱动测试（排序稳定性、graph 快照与往返、断行 12 例、度量 4 例、锚点 9 位 + 负溢出、Resolver 缓存行为）。
-- 布局快照 fixture 轨（M3）：PHP 导出脚本产出"断行行数 + 行内容 + 锚点坐标"JSON 进仓库，Go 断言；PHP 导出走 Makefile 人工触发，不进 Go CI。文本 y 为预期差异字段。
+- 布局快照 fixture 轨（M3）：PHP 导出脚本产出"断行行数 + 行内容 + 锚点坐标"JSON 进仓库，Go 断言；PHP 导出走 Makefile 人工触发，不进 Go CI。文本 y 为预期差异字段。（工单 10 已落地，契约与再生成流程见 docs/layout-snapshot.md）
 - 渲染侧（M2）：像素属性断言（点位取样）+ golden 容差，不做逐像素复刻；平移 visual-check 目验脚本。
 
 ## 交付节奏

@@ -1,0 +1,2233 @@
+{
+    "meta": {
+        "contract": "layout-snapshot v1",
+        "generator": "php-canvas-next/scripts/export-layout-snapshot.php",
+        "notes": [
+            "PHP 侧对固定用例集导出的双端布局快照(go-canvas 工单 10),Go 测试逐字段断言;",
+            "graph 为输入(与 php-canvas-next Canvas::graph() 键级一致),records 为渲染模板绘制原语记录(paint 序,即 priority 降序);",
+            "文本行 y 是预期差异字段:expectedYDiff = getTextOrigin bottom+autowrap 分支的 GD 基线魔数 round(fontSize*0.1),",
+            "Go 按 ADR-0003 纯对齐锚点语义断言 goY == y + expectedYDiff;其余坐标、行数、行内容逐字段严格一致;",
+            "用例集保证 ext-intl 字素簇切分与 Go 默认码点切分断行一致(emoji 仅单码点字素,ZWJ 序列不进快照);",
+            "再生成: go-canvas 仓库 make layout-snapshot(需本机 PHP 8.3 + ext-intl),流程见 go-canvas/docs/layout-snapshot.md"
+        ]
+    },
+    "cases": [
+        {
+            "name": "cjk-autowrap",
+            "description": "CJK 逐字断行 + 显式换行保留空行 + padding + 行高 1.4 + autoHeight；默认 bottom+autowrap 走预期差异分支(expectedYDiff=2)",
+            "graph": {
+                "canvas": {
+                    "width": 120,
+                    "height": 60
+                },
+                "layers": [
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 100,
+                                "height": 0,
+                                "autoWidth": false,
+                                "autoHeight": true,
+                                "lineHeight": 1.4,
+                                "padding": {
+                                    "top": 4,
+                                    "bottom": 4,
+                                    "left": 4,
+                                    "right": 4
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "bottom"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 16,
+                                "fontColor": "#333333",
+                                "angle": 0,
+                                "autowrap": true
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "画布渲染库快照用例第一段超长文本\n\n第二段落继续自动断行"
+                        }
+                    }
+                ]
+            },
+            "records": [
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 0,
+                    "w": 100,
+                    "h": 169
+                },
+                {
+                    "op": "text",
+                    "line": "画布渲染库",
+                    "x": 4,
+                    "y": 25,
+                    "expectedYDiff": 2
+                },
+                {
+                    "op": "text",
+                    "line": "快照用例第",
+                    "x": 4,
+                    "y": 48,
+                    "expectedYDiff": 2
+                },
+                {
+                    "op": "text",
+                    "line": "一段超长文",
+                    "x": 4,
+                    "y": 71,
+                    "expectedYDiff": 2
+                },
+                {
+                    "op": "text",
+                    "line": "本",
+                    "x": 4,
+                    "y": 94,
+                    "expectedYDiff": 2
+                },
+                {
+                    "op": "text",
+                    "line": "",
+                    "x": 4,
+                    "y": 117,
+                    "expectedYDiff": 2
+                },
+                {
+                    "op": "text",
+                    "line": "第二段落继",
+                    "x": 4,
+                    "y": 140,
+                    "expectedYDiff": 2
+                },
+                {
+                    "op": "text",
+                    "line": "续自动断行",
+                    "x": 4,
+                    "y": 163,
+                    "expectedYDiff": 2
+                }
+            ]
+        },
+        {
+            "name": "kinsoku-word-boundary",
+            "description": "行首禁则标点上移、行末禁则标点下移、空格词边界、连字符保留行尾、无边界长词硬断、断点行尾空白剔除",
+            "graph": {
+                "canvas": {
+                    "width": 120,
+                    "height": 60
+                },
+                "layers": [
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 120,
+                                "height": 0,
+                                "autoWidth": false,
+                                "autoHeight": true,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "bottom"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": true
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "一二三四五六七八九十，甲乙丙丁戊己庚辛壬（癸 latin words wrap at spaces, hyphen-ated and co-op terms, superlongwordwithoutboundary breaks hard\naaaa-bbbbb-cccccdddddeeeee tail"
+                        }
+                    }
+                ]
+            },
+            "records": [
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 0,
+                    "w": 120,
+                    "h": 144
+                },
+                {
+                    "op": "text",
+                    "line": "一二三四五六七八九十，",
+                    "x": 0,
+                    "y": 11,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "甲乙丙丁戊己庚辛壬",
+                    "x": 0,
+                    "y": 23,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "（癸 latin words",
+                    "x": 0,
+                    "y": 35,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "wrap at spaces,",
+                    "x": 0,
+                    "y": 47,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "hyphen-ated and",
+                    "x": 0,
+                    "y": 59,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "co-op terms,",
+                    "x": 0,
+                    "y": 71,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "superlongwordwitho",
+                    "x": 0,
+                    "y": 83,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "utboundary breaks",
+                    "x": 0,
+                    "y": 95,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "hard",
+                    "x": 0,
+                    "y": 107,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "aaaa-bbbbb-",
+                    "x": 0,
+                    "y": 119,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "cccccdddddeeeee",
+                    "x": 0,
+                    "y": 131,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "tail",
+                    "x": 0,
+                    "y": 143,
+                    "expectedYDiff": 1
+                }
+            ]
+        },
+        {
+            "name": "emoji-mixed",
+            "description": "单码点 emoji 与中文混排断行（字素簇与码点两条切分路径行为一致）",
+            "graph": {
+                "canvas": {
+                    "width": 80,
+                    "height": 40
+                },
+                "layers": [
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 80,
+                                "height": 0,
+                                "autoWidth": false,
+                                "autoHeight": true,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "bottom"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": true
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "表情👍与中文😀混排🎉断行试试"
+                        }
+                    }
+                ]
+            },
+            "records": [
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 0,
+                    "w": 80,
+                    "h": 36
+                },
+                {
+                    "op": "text",
+                    "line": "表情👍与中文",
+                    "x": 0,
+                    "y": 11,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "😀混排🎉断行",
+                    "x": 0,
+                    "y": 23,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "试试",
+                    "x": 0,
+                    "y": 35,
+                    "expectedYDiff": 1
+                }
+            ]
+        },
+        {
+            "name": "align-origin-grid",
+            "description": "水平×垂直九种对齐组合（固定高，center 分支含 padding 内容盒）+ center×autoHeight 分支 + bottom×autowrap 多行预期差异分支",
+            "graph": {
+                "canvas": {
+                    "width": 280,
+                    "height": 280
+                },
+                "layers": [
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 40,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 4,
+                                    "bottom": 4,
+                                    "left": 4,
+                                    "right": 4
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "top"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "对齐锚点"
+                        }
+                    },
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 40,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 4,
+                                    "bottom": 4,
+                                    "left": 4,
+                                    "right": 4
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "top"
+                            },
+                            "position": {
+                                "x": 90,
+                                "y": 0,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "对齐锚点"
+                        }
+                    },
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 40,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 4,
+                                    "bottom": 4,
+                                    "left": 4,
+                                    "right": 4
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "right",
+                                "vertical": "top"
+                            },
+                            "position": {
+                                "x": 180,
+                                "y": 0,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "对齐锚点"
+                        }
+                    },
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 40,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 4,
+                                    "bottom": 4,
+                                    "left": 4,
+                                    "right": 4
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 80,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "对齐锚点"
+                        }
+                    },
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 40,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 4,
+                                    "bottom": 4,
+                                    "left": 4,
+                                    "right": 4
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 90,
+                                "y": 80,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "对齐锚点"
+                        }
+                    },
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 40,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 4,
+                                    "bottom": 4,
+                                    "left": 4,
+                                    "right": 4
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "right",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 180,
+                                "y": 80,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "对齐锚点"
+                        }
+                    },
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 40,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 4,
+                                    "bottom": 4,
+                                    "left": 4,
+                                    "right": 4
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "bottom"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 160,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "对齐锚点"
+                        }
+                    },
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 40,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 4,
+                                    "bottom": 4,
+                                    "left": 4,
+                                    "right": 4
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "bottom"
+                            },
+                            "position": {
+                                "x": 90,
+                                "y": 160,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "对齐锚点"
+                        }
+                    },
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 40,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 4,
+                                    "bottom": 4,
+                                    "left": 4,
+                                    "right": 4
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "right",
+                                "vertical": "bottom"
+                            },
+                            "position": {
+                                "x": 180,
+                                "y": 160,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "对齐锚点"
+                        }
+                    },
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 0,
+                                "autoWidth": false,
+                                "autoHeight": true,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 4,
+                                    "bottom": 4,
+                                    "left": 4,
+                                    "right": 4
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 240,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "自适应"
+                        }
+                    },
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 40,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "bottom"
+                            },
+                            "position": {
+                                "x": 90,
+                                "y": 240,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": true
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "底部对齐多行文本"
+                        }
+                    }
+                ]
+            },
+            "records": [
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 0,
+                    "w": 60,
+                    "h": 40
+                },
+                {
+                    "op": "text",
+                    "line": "对齐锚点",
+                    "x": 4,
+                    "y": 4,
+                    "expectedYDiff": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 90,
+                    "y": 0,
+                    "w": 60,
+                    "h": 40
+                },
+                {
+                    "op": "text",
+                    "line": "对齐锚点",
+                    "x": 120,
+                    "y": 4,
+                    "expectedYDiff": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 180,
+                    "y": 0,
+                    "w": 60,
+                    "h": 40
+                },
+                {
+                    "op": "text",
+                    "line": "对齐锚点",
+                    "x": 236,
+                    "y": 4,
+                    "expectedYDiff": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 80,
+                    "w": 60,
+                    "h": 40
+                },
+                {
+                    "op": "text",
+                    "line": "对齐锚点",
+                    "x": 4,
+                    "y": 100,
+                    "expectedYDiff": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 90,
+                    "y": 80,
+                    "w": 60,
+                    "h": 40
+                },
+                {
+                    "op": "text",
+                    "line": "对齐锚点",
+                    "x": 120,
+                    "y": 100,
+                    "expectedYDiff": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 180,
+                    "y": 80,
+                    "w": 60,
+                    "h": 40
+                },
+                {
+                    "op": "text",
+                    "line": "对齐锚点",
+                    "x": 236,
+                    "y": 100,
+                    "expectedYDiff": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 160,
+                    "w": 60,
+                    "h": 40
+                },
+                {
+                    "op": "text",
+                    "line": "对齐锚点",
+                    "x": 4,
+                    "y": 196,
+                    "expectedYDiff": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 90,
+                    "y": 160,
+                    "w": 60,
+                    "h": 40
+                },
+                {
+                    "op": "text",
+                    "line": "对齐锚点",
+                    "x": 120,
+                    "y": 196,
+                    "expectedYDiff": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 180,
+                    "y": 160,
+                    "w": 60,
+                    "h": 40
+                },
+                {
+                    "op": "text",
+                    "line": "对齐锚点",
+                    "x": 236,
+                    "y": 196,
+                    "expectedYDiff": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 240,
+                    "w": 60,
+                    "h": 20
+                },
+                {
+                    "op": "text",
+                    "line": "自适应",
+                    "x": 30,
+                    "y": 250,
+                    "expectedYDiff": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 90,
+                    "y": 240,
+                    "w": 60,
+                    "h": 40
+                },
+                {
+                    "op": "text",
+                    "line": "底部对齐多",
+                    "x": 90,
+                    "y": 267,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "行文本",
+                    "x": 90,
+                    "y": 279,
+                    "expectedYDiff": 1
+                }
+            ]
+        },
+        {
+            "name": "anchors-containers",
+            "description": "九锚点摆位 + 负偏移溢出 + priority 渲染次序 + 表格嵌套（行堆叠/单元格横排/单元格 content:null/表格内容层）",
+            "graph": {
+                "canvas": {
+                    "width": 320,
+                    "height": 280
+                },
+                "layers": [
+                    {
+                        "type": "TableLayer",
+                        "priority": 5,
+                        "spec": {
+                            "shape": {
+                                "width": 200,
+                                "height": 0,
+                                "autoWidth": false,
+                                "autoHeight": true,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "top"
+                            },
+                            "position": {
+                                "x": 40,
+                                "y": 180,
+                                "position": "top-left"
+                            }
+                        },
+                        "rows": [
+                            {
+                                "type": "TableRowLayer",
+                                "priority": 0,
+                                "spec": {
+                                    "shape": {
+                                        "width": 200,
+                                        "height": 40,
+                                        "autoWidth": false,
+                                        "autoHeight": false,
+                                        "lineHeight": 1,
+                                        "padding": {
+                                            "top": 0,
+                                            "bottom": 0,
+                                            "left": 0,
+                                            "right": 0
+                                        },
+                                        "border": {
+                                            "top": null,
+                                            "bottom": null,
+                                            "left": null,
+                                            "right": null
+                                        },
+                                        "backgroundColor": null
+                                    },
+                                    "align": {
+                                        "horizontal": "left",
+                                        "vertical": "top"
+                                    },
+                                    "position": {
+                                        "x": 0,
+                                        "y": 0,
+                                        "position": "top-left"
+                                    }
+                                },
+                                "cells": [
+                                    {
+                                        "type": "TableCellLayer",
+                                        "priority": 0,
+                                        "spec": {
+                                            "shape": {
+                                                "width": 100,
+                                                "height": 32,
+                                                "autoWidth": false,
+                                                "autoHeight": false,
+                                                "lineHeight": 1,
+                                                "padding": {
+                                                    "top": 0,
+                                                    "bottom": 0,
+                                                    "left": 0,
+                                                    "right": 0
+                                                },
+                                                "border": {
+                                                    "top": null,
+                                                    "bottom": null,
+                                                    "left": null,
+                                                    "right": null
+                                                },
+                                                "backgroundColor": null
+                                            },
+                                            "align": {
+                                                "horizontal": "left",
+                                                "vertical": "top"
+                                            },
+                                            "position": {
+                                                "x": 0,
+                                                "y": 0,
+                                                "position": "top-left"
+                                            }
+                                        },
+                                        "content": {
+                                            "type": "TextLayer",
+                                            "priority": 0,
+                                            "spec": {
+                                                "shape": {
+                                                    "width": 100,
+                                                    "height": 32,
+                                                    "autoWidth": false,
+                                                    "autoHeight": false,
+                                                    "lineHeight": 1,
+                                                    "padding": {
+                                                        "top": 4,
+                                                        "bottom": 4,
+                                                        "left": 4,
+                                                        "right": 4
+                                                    },
+                                                    "border": {
+                                                        "top": null,
+                                                        "bottom": null,
+                                                        "left": null,
+                                                        "right": null
+                                                    },
+                                                    "backgroundColor": null
+                                                },
+                                                "align": {
+                                                    "horizontal": "left",
+                                                    "vertical": "bottom"
+                                                },
+                                                "position": {
+                                                    "x": 0,
+                                                    "y": 0,
+                                                    "position": "top-left"
+                                                },
+                                                "fontFamily": {
+                                                    "font": "",
+                                                    "fontSize": 12,
+                                                    "fontColor": "#000000",
+                                                    "angle": 0,
+                                                    "autowrap": true
+                                                }
+                                            },
+                                            "data": {
+                                                "valueType": "StaticValue",
+                                                "expression": "",
+                                                "value": "表格内文本自动断行排版"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "type": "TableCellLayer",
+                                        "priority": 0,
+                                        "spec": {
+                                            "shape": {
+                                                "width": 100,
+                                                "height": 40,
+                                                "autoWidth": false,
+                                                "autoHeight": false,
+                                                "lineHeight": 1,
+                                                "padding": {
+                                                    "top": 0,
+                                                    "bottom": 0,
+                                                    "left": 0,
+                                                    "right": 0
+                                                },
+                                                "border": {
+                                                    "top": null,
+                                                    "bottom": null,
+                                                    "left": null,
+                                                    "right": null
+                                                },
+                                                "backgroundColor": null
+                                            },
+                                            "align": {
+                                                "horizontal": "left",
+                                                "vertical": "top"
+                                            },
+                                            "position": {
+                                                "x": 0,
+                                                "y": 0,
+                                                "position": "top-left"
+                                            }
+                                        },
+                                        "content": {
+                                            "type": "ImageLayer",
+                                            "priority": 0,
+                                            "spec": {
+                                                "shape": {
+                                                    "width": 100,
+                                                    "height": 40,
+                                                    "autoWidth": false,
+                                                    "autoHeight": false,
+                                                    "lineHeight": 1,
+                                                    "padding": {
+                                                        "top": 0,
+                                                        "bottom": 0,
+                                                        "left": 0,
+                                                        "right": 0
+                                                    },
+                                                    "border": {
+                                                        "top": null,
+                                                        "bottom": null,
+                                                        "left": null,
+                                                        "right": null
+                                                    },
+                                                    "backgroundColor": null
+                                                },
+                                                "align": {
+                                                    "horizontal": "center",
+                                                    "vertical": "center"
+                                                },
+                                                "position": {
+                                                    "x": 0,
+                                                    "y": 0,
+                                                    "position": "top-left"
+                                                }
+                                            },
+                                            "data": {
+                                                "valueType": "StaticValue",
+                                                "value": null
+                                            }
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "TableRowLayer",
+                                "priority": 0,
+                                "spec": {
+                                    "shape": {
+                                        "width": 200,
+                                        "height": 60,
+                                        "autoWidth": false,
+                                        "autoHeight": false,
+                                        "lineHeight": 1,
+                                        "padding": {
+                                            "top": 0,
+                                            "bottom": 0,
+                                            "left": 0,
+                                            "right": 0
+                                        },
+                                        "border": {
+                                            "top": null,
+                                            "bottom": null,
+                                            "left": null,
+                                            "right": null
+                                        },
+                                        "backgroundColor": null
+                                    },
+                                    "align": {
+                                        "horizontal": "left",
+                                        "vertical": "top"
+                                    },
+                                    "position": {
+                                        "x": 0,
+                                        "y": 0,
+                                        "position": "top-left"
+                                    }
+                                },
+                                "cells": [
+                                    {
+                                        "type": "TableCellLayer",
+                                        "priority": 0,
+                                        "spec": {
+                                            "shape": {
+                                                "width": 200,
+                                                "height": 60,
+                                                "autoWidth": false,
+                                                "autoHeight": false,
+                                                "lineHeight": 1,
+                                                "padding": {
+                                                    "top": 0,
+                                                    "bottom": 0,
+                                                    "left": 0,
+                                                    "right": 0
+                                                },
+                                                "border": {
+                                                    "top": null,
+                                                    "bottom": null,
+                                                    "left": null,
+                                                    "right": null
+                                                },
+                                                "backgroundColor": null
+                                            },
+                                            "align": {
+                                                "horizontal": "left",
+                                                "vertical": "top"
+                                            },
+                                            "position": {
+                                                "x": 0,
+                                                "y": 0,
+                                                "position": "top-left"
+                                            }
+                                        },
+                                        "content": {
+                                            "type": "TableLayer",
+                                            "priority": 0,
+                                            "spec": {
+                                                "shape": {
+                                                    "width": 200,
+                                                    "height": 60,
+                                                    "autoWidth": false,
+                                                    "autoHeight": false,
+                                                    "lineHeight": 1,
+                                                    "padding": {
+                                                        "top": 0,
+                                                        "bottom": 0,
+                                                        "left": 0,
+                                                        "right": 0
+                                                    },
+                                                    "border": {
+                                                        "top": null,
+                                                        "bottom": null,
+                                                        "left": null,
+                                                        "right": null
+                                                    },
+                                                    "backgroundColor": null
+                                                },
+                                                "align": {
+                                                    "horizontal": "left",
+                                                    "vertical": "top"
+                                                },
+                                                "position": {
+                                                    "x": 0,
+                                                    "y": 0,
+                                                    "position": "top-left"
+                                                }
+                                            },
+                                            "rows": [
+                                                {
+                                                    "type": "TableRowLayer",
+                                                    "priority": 0,
+                                                    "spec": {
+                                                        "shape": {
+                                                            "width": 200,
+                                                            "height": 30,
+                                                            "autoWidth": false,
+                                                            "autoHeight": false,
+                                                            "lineHeight": 1,
+                                                            "padding": {
+                                                                "top": 0,
+                                                                "bottom": 0,
+                                                                "left": 0,
+                                                                "right": 0
+                                                            },
+                                                            "border": {
+                                                                "top": null,
+                                                                "bottom": null,
+                                                                "left": null,
+                                                                "right": null
+                                                            },
+                                                            "backgroundColor": null
+                                                        },
+                                                        "align": {
+                                                            "horizontal": "left",
+                                                            "vertical": "top"
+                                                        },
+                                                        "position": {
+                                                            "x": 0,
+                                                            "y": 0,
+                                                            "position": "top-left"
+                                                        }
+                                                    },
+                                                    "cells": [
+                                                        {
+                                                            "type": "TableCellLayer",
+                                                            "priority": 0,
+                                                            "spec": {
+                                                                "shape": {
+                                                                    "width": 60,
+                                                                    "height": 30,
+                                                                    "autoWidth": false,
+                                                                    "autoHeight": false,
+                                                                    "lineHeight": 1,
+                                                                    "padding": {
+                                                                        "top": 0,
+                                                                        "bottom": 0,
+                                                                        "left": 0,
+                                                                        "right": 0
+                                                                    },
+                                                                    "border": {
+                                                                        "top": null,
+                                                                        "bottom": null,
+                                                                        "left": null,
+                                                                        "right": null
+                                                                    },
+                                                                    "backgroundColor": null
+                                                                },
+                                                                "align": {
+                                                                    "horizontal": "left",
+                                                                    "vertical": "top"
+                                                                },
+                                                                "position": {
+                                                                    "x": 0,
+                                                                    "y": 0,
+                                                                    "position": "top-left"
+                                                                }
+                                                            },
+                                                            "content": null
+                                                        },
+                                                        {
+                                                            "type": "TableCellLayer",
+                                                            "priority": 0,
+                                                            "spec": {
+                                                                "shape": {
+                                                                    "width": 140,
+                                                                    "height": 30,
+                                                                    "autoWidth": false,
+                                                                    "autoHeight": false,
+                                                                    "lineHeight": 1,
+                                                                    "padding": {
+                                                                        "top": 0,
+                                                                        "bottom": 0,
+                                                                        "left": 0,
+                                                                        "right": 0
+                                                                    },
+                                                                    "border": {
+                                                                        "top": null,
+                                                                        "bottom": null,
+                                                                        "left": null,
+                                                                        "right": null
+                                                                    },
+                                                                    "backgroundColor": null
+                                                                },
+                                                                "align": {
+                                                                    "horizontal": "left",
+                                                                    "vertical": "top"
+                                                                },
+                                                                "position": {
+                                                                    "x": 0,
+                                                                    "y": 0,
+                                                                    "position": "top-left"
+                                                                }
+                                                            },
+                                                            "content": null
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "TableRowLayer",
+                                                    "priority": 0,
+                                                    "spec": {
+                                                        "shape": {
+                                                            "width": 200,
+                                                            "height": 30,
+                                                            "autoWidth": false,
+                                                            "autoHeight": false,
+                                                            "lineHeight": 1,
+                                                            "padding": {
+                                                                "top": 0,
+                                                                "bottom": 0,
+                                                                "left": 0,
+                                                                "right": 0
+                                                            },
+                                                            "border": {
+                                                                "top": null,
+                                                                "bottom": null,
+                                                                "left": null,
+                                                                "right": null
+                                                            },
+                                                            "backgroundColor": null
+                                                        },
+                                                        "align": {
+                                                            "horizontal": "left",
+                                                            "vertical": "top"
+                                                        },
+                                                        "position": {
+                                                            "x": 0,
+                                                            "y": 0,
+                                                            "position": "top-left"
+                                                        }
+                                                    },
+                                                    "cells": [
+                                                        {
+                                                            "type": "TableCellLayer",
+                                                            "priority": 0,
+                                                            "spec": {
+                                                                "shape": {
+                                                                    "width": 200,
+                                                                    "height": 30,
+                                                                    "autoWidth": false,
+                                                                    "autoHeight": false,
+                                                                    "lineHeight": 1,
+                                                                    "padding": {
+                                                                        "top": 0,
+                                                                        "bottom": 0,
+                                                                        "left": 0,
+                                                                        "right": 0
+                                                                    },
+                                                                    "border": {
+                                                                        "top": null,
+                                                                        "bottom": null,
+                                                                        "left": null,
+                                                                        "right": null
+                                                                    },
+                                                                    "backgroundColor": null
+                                                                },
+                                                                "align": {
+                                                                    "horizontal": "left",
+                                                                    "vertical": "top"
+                                                                },
+                                                                "position": {
+                                                                    "x": 0,
+                                                                    "y": 0,
+                                                                    "position": "top-left"
+                                                                }
+                                                            },
+                                                            "content": null
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 40,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "bottom"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "锚"
+                        }
+                    },
+                    {
+                        "type": "ImageLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 40,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top"
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "value": null
+                        }
+                    },
+                    {
+                        "type": "QrCodeLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 40,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "top"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-right"
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "value": ""
+                        }
+                    },
+                    {
+                        "type": "ImageLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 40,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "left"
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "value": null
+                        }
+                    },
+                    {
+                        "type": "QrCodeLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 40,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "top"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "center"
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "value": ""
+                        }
+                    },
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 40,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "bottom"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "right"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "锚"
+                        }
+                    },
+                    {
+                        "type": "QrCodeLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 40,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "top"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "bottom-left"
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "value": ""
+                        }
+                    },
+                    {
+                        "type": "TextLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 40,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "bottom"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "bottom"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "锚"
+                        }
+                    },
+                    {
+                        "type": "ImageLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 40,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "bottom-right"
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "value": null
+                        }
+                    },
+                    {
+                        "type": "TextLayer",
+                        "priority": -3,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "bottom"
+                            },
+                            "position": {
+                                "x": -8,
+                                "y": -6,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "溢出"
+                        }
+                    }
+                ]
+            },
+            "records": [
+                {
+                    "op": "rect",
+                    "x": 40,
+                    "y": 180,
+                    "w": 200,
+                    "h": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 40,
+                    "y": 180,
+                    "w": 200,
+                    "h": 40
+                },
+                {
+                    "op": "rect",
+                    "x": 40,
+                    "y": 180,
+                    "w": 100,
+                    "h": 32
+                },
+                {
+                    "op": "rect",
+                    "x": 40,
+                    "y": 180,
+                    "w": 100,
+                    "h": 32
+                },
+                {
+                    "op": "text",
+                    "line": "表格内文本自动",
+                    "x": 44,
+                    "y": 195,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "text",
+                    "line": "断行排版",
+                    "x": 44,
+                    "y": 207,
+                    "expectedYDiff": 1
+                },
+                {
+                    "op": "rect",
+                    "x": 140,
+                    "y": 180,
+                    "w": 100,
+                    "h": 40
+                },
+                {
+                    "op": "rect",
+                    "x": 140,
+                    "y": 180,
+                    "w": 100,
+                    "h": 40
+                },
+                {
+                    "op": "rect",
+                    "x": 40,
+                    "y": 220,
+                    "w": 200,
+                    "h": 60
+                },
+                {
+                    "op": "rect",
+                    "x": 40,
+                    "y": 220,
+                    "w": 200,
+                    "h": 60
+                },
+                {
+                    "op": "rect",
+                    "x": 40,
+                    "y": 220,
+                    "w": 200,
+                    "h": 60
+                },
+                {
+                    "op": "rect",
+                    "x": 40,
+                    "y": 220,
+                    "w": 200,
+                    "h": 30
+                },
+                {
+                    "op": "rect",
+                    "x": 40,
+                    "y": 220,
+                    "w": 60,
+                    "h": 30
+                },
+                {
+                    "op": "rect",
+                    "x": 100,
+                    "y": 220,
+                    "w": 140,
+                    "h": 30
+                },
+                {
+                    "op": "rect",
+                    "x": 40,
+                    "y": 250,
+                    "w": 200,
+                    "h": 30
+                },
+                {
+                    "op": "rect",
+                    "x": 40,
+                    "y": 250,
+                    "w": 200,
+                    "h": 30
+                },
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 0,
+                    "w": 40,
+                    "h": 24
+                },
+                {
+                    "op": "text",
+                    "line": "锚",
+                    "x": 0,
+                    "y": 24,
+                    "expectedYDiff": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 140,
+                    "y": 0,
+                    "w": 40,
+                    "h": 24
+                },
+                {
+                    "op": "rect",
+                    "x": 280,
+                    "y": 0,
+                    "w": 40,
+                    "h": 24
+                },
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 128,
+                    "w": 40,
+                    "h": 24
+                },
+                {
+                    "op": "rect",
+                    "x": 140,
+                    "y": 128,
+                    "w": 40,
+                    "h": 24
+                },
+                {
+                    "op": "rect",
+                    "x": 280,
+                    "y": 128,
+                    "w": 40,
+                    "h": 24
+                },
+                {
+                    "op": "text",
+                    "line": "锚",
+                    "x": 280,
+                    "y": 152,
+                    "expectedYDiff": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 256,
+                    "w": 40,
+                    "h": 24
+                },
+                {
+                    "op": "rect",
+                    "x": 140,
+                    "y": 256,
+                    "w": 40,
+                    "h": 24
+                },
+                {
+                    "op": "text",
+                    "line": "锚",
+                    "x": 140,
+                    "y": 280,
+                    "expectedYDiff": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 280,
+                    "y": 256,
+                    "w": 40,
+                    "h": 24
+                },
+                {
+                    "op": "rect",
+                    "x": -8,
+                    "y": -6,
+                    "w": 60,
+                    "h": 24
+                },
+                {
+                    "op": "text",
+                    "line": "溢出",
+                    "x": -8,
+                    "y": 18,
+                    "expectedYDiff": 0
+                }
+            ]
+        }
+    ]
+}
