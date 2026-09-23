@@ -25,13 +25,13 @@ func tiffWithOrientation(bo binary.ByteOrder, typ, orientation uint16) []byte {
 	} else {
 		b.WriteString("MM")
 	}
-	_ = binary.Write(&b, bo, uint16(42))  // 魔数
-	_ = binary.Write(&b, bo, uint32(8))   // IFD0 偏移紧随头部
-	_ = binary.Write(&b, bo, uint16(1))   // 条目数
+	_ = binary.Write(&b, bo, uint16(42))     // 魔数
+	_ = binary.Write(&b, bo, uint32(8))      // IFD0 偏移紧随头部
+	_ = binary.Write(&b, bo, uint16(1))      // 条目数
 	_ = binary.Write(&b, bo, uint16(0x0112)) // Orientation
 	_ = binary.Write(&b, bo, typ)
 	_ = binary.Write(&b, bo, uint32(1)) // 计数
-	if typ == 3 {                        // SHORT 内联于值字段前 2 字节
+	if typ == 3 {                       // SHORT 内联于值字段前 2 字节
 		_ = binary.Write(&b, bo, orientation)
 		_ = binary.Write(&b, bo, uint16(0))
 	} else { // LONG
@@ -133,13 +133,13 @@ func TestApplyOrientationAllDirections(t *testing.T) {
 		want        string
 	}{
 		{1, "ABC/DEF"},
-		{2, "CBA/FED"},   // 水平镜像
-		{3, "FED/CBA"},   // 旋转 180°
-		{4, "DEF/ABC"},   // 垂直镜像
-		{5, "AD/BE/CF"},  // 转置(主对角镜像)
-		{6, "DA/EB/FC"},  // 旋转 90° 顺时针
-		{7, "FC/EB/DA"},  // 反转置(反对角镜像)
-		{8, "CF/BE/AD"},  // 旋转 90° 逆时针
+		{2, "CBA/FED"},  // 水平镜像
+		{3, "FED/CBA"},  // 旋转 180°
+		{4, "DEF/ABC"},  // 垂直镜像
+		{5, "AD/BE/CF"}, // 转置(主对角镜像)
+		{6, "DA/EB/FC"}, // 旋转 90° 顺时针
+		{7, "FC/EB/DA"}, // 反转置(反对角镜像)
+		{8, "CF/BE/AD"}, // 旋转 90° 逆时针
 	}
 	for _, tc := range cases {
 		t.Run("orientation "+strconv.Itoa(tc.orientation), func(t *testing.T) {

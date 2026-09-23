@@ -1,7 +1,7 @@
 // Package imagerenderer 核心包的位图渲染后端:以标准库 image 新建透明位图为
 // 渲染面,实现五个绘制原语接入渲染模板;承载 PNG/JPEG 解码、EXIF 转正、
-// cover 缩放裁切与 PNG 编码落盘。对应 PHP 侧的 php-canvas-image-renderer 包,
-// End 产物为 *image.NRGBA。文本绘制原语由后续工单接管,当前为空操作。
+// cover 缩放裁切、文本绘制(opentype 字体 + 内置默认字体兜底)与 PNG 编码
+// 落盘。对应 PHP 侧的 php-canvas-image-renderer 包,End 产物为 *image.NRGBA。
 package imagerenderer
 
 import (
@@ -14,12 +14,16 @@ import (
 
 	"github.com/hankchen/go-canvas/layer"
 	"github.com/hankchen/go-canvas/renderer"
+	"golang.org/x/image/font"
 )
 
 // Renderer 位图渲染后端:实现 renderer.Backend,产物为透明底 *image.NRGBA。
-// 同一实例可跨多次渲染复用,Begin 即重置渲染面
+// 同一实例可跨多次渲染复用,Begin 即重置渲染面。**非并发安全**:字体 Face
+// 按渲染会话(实例)持有(opentype.Face 与渲染面位图均非并发安全),并发
+// 渲染请各自 New
 type Renderer struct {
 	surface *image.NRGBA
+	faces   map[fontKey]font.Face
 }
 
 var _ renderer.Backend = (*Renderer)(nil)
@@ -54,7 +58,7 @@ func (r *Renderer) End() any {
 }
 
 // DrawRect implements renderer.Backend:背景色 + 四边边框。
-// 背景为 nil 或空串跳过填充(PHP `$bgColor !== null && $bgColor !== ''` 守卫);
+// 背景为 nil 或空串跳过填充(PHP 同款守卫:非 null 且非空串才填充);
 // 边框 = 四边各一条线宽=边框宽的直线(非描边矩形),按盒内嵌绘制,逐边可 nil
 func (r *Renderer) DrawRect(x, y, width, height int, bgColor *string, border layer.Border) error {
 	surface, err := r.face()
@@ -124,21 +128,6 @@ func (r *Renderer) DrawImage(src string, x, y, width, height int) error {
 	}
 	covered := coverImage(img, width, height)
 	draw.Draw(surface, image.Rect(x, y, x+width, y+height), covered, image.Point{}, draw.Over)
-	return nil
-}
-
-// DrawText implements renderer.Backend:文本绘制留空,后续工单(07)以真实字体
-// metrics 接管;模板仍会逐行调用,此处零像素副作用
-func (r *Renderer) DrawText(
-	line string,
-	x, y int,
-	fontFile string,
-	fontSize int,
-	fontColor string,
-	horizontalAlign string,
-	verticalAlign string,
-	angle int,
-) error {
 	return nil
 }
 

@@ -29,6 +29,7 @@
 - 增强实现（opentype 真实度量 + typesetting 完整 UAX #14）M3 交付，可注入、非默认。
 - PHP `getTextOrigin()` 的 GD 基线魔数 `- round(fontSize*0.1)` **不移植**：布局层返回纯对齐锚点，基线差由渲染后端 `drawText` 用字体 metrics 消化；双端布局快照中文本 y 坐标是预期差异字段。
 - 字素切分：核心包零依赖 → text 包定义 `Segmenter` 接缝，默认码点切分（等价 PHP 无 ext-intl 的降级路径）；M3 的文本 module 注入 UAX #29 实现（等价 PHP 有 ext-intl 的正常路径）。
+- 内置默认字体（工单 07）：Go 无 GD 内置字体的对应物，空串/纯数字字体 id 的"内置默认字体语义"取 x/image 自带 `basicfont.Face7x13` 兜底（后端 module 零新增依赖；固定 7×13 点阵仅覆盖 ASCII 且字号无效，CJK 必须显式提供真实字体文件）。真实字体按 magic bytes 分派 opentype Parse/ParseCollection（TTC 取首个 face）；opentype.Face 非并发安全，按渲染会话（Renderer 实例）持有。
 
 ## 行为对等（可观察行为面）
 

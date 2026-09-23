@@ -50,7 +50,7 @@ func TestDrawRectSkipsNilBackgroundAndUnsetBorders(t *testing.T) {
 	}
 	img := r.End().(*image.NRGBA)
 
-	assertPixel(t, img, 10, 1, blue)  // 仅 top 边
+	assertPixel(t, img, 10, 1, blue)   // 仅 top 边
 	assertPixel(t, img, 10, 10, clear) // 背景为 null 跳过填充,保持透明
 	assertPixel(t, img, 1, 10, clear)  // 未设的 left 边
 	assertPixel(t, img, 10, 19, clear) // 未设的 bottom 边
@@ -135,16 +135,6 @@ func TestDrawImageMissingFileAborts(t *testing.T) {
 	if err := r.DrawImage("/nonexistent/go-canvas-fixture.png", 0, 0, 5, 5); err == nil {
 		t.Fatal("读取失败应报错中止")
 	}
-}
-
-func TestDrawTextStubsNoopUntilTicket07(t *testing.T) {
-	// 文本原语先行留空(工单07 接管):零像素副作用
-	r := newSurfaceBackend(t)
-	if err := r.DrawText("abc", 10, 10, "", 12, "#000", "left", "top", 0); err != nil {
-		t.Fatalf("DrawText: %v", err)
-	}
-	img := r.End().(*image.NRGBA)
-	assertPixel(t, img, 10, 10, clear)
 }
 
 func TestEndBeforeBeginReturnsNil(t *testing.T) {

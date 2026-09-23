@@ -140,7 +140,7 @@ func (r *ResourceResolver) materializeImage(ctx context.Context, l *layer.ImageL
 // 本地路径直接使用;仅 URL 下载并回写(渲染实际字体 = 物化结果优先)
 func (r *ResourceResolver) materializeFont(ctx context.Context, l *layer.TextLayer) error {
 	font := l.Font()
-	if font == "" || isNumeric(font) || !isRemoteURL(font) {
+	if font == "" || IsNumeric(font) || !isRemoteURL(font) {
 		return nil
 	}
 
@@ -253,10 +253,12 @@ func isRemoteURL(s string) bool {
 	return err == nil && u.Scheme != "" && u.Host != ""
 }
 
-// isNumeric 纯数字判定:strconv.ParseFloat 近似 PHP is_numeric(整型/浮点字面量),
-// 超集接受 Inf/NaN 等——对字体取值无观察差异(这类值也必然非 URL,两分支同为跳过),
-// 纯数字字体表示渲染端内置默认字体标识
-func isNumeric(s string) bool {
+// IsNumeric 纯数字判定:strconv.ParseFloat 近似 PHP is_numeric(整型/浮点字面量),
+// 超集接受 Inf/NaN 等——Resolver 侧无观察差异(这类值也必然非 URL,两分支同为
+// 跳过)。纯数字字体 id 是旧库 GD 内置字体编号,语义 = "无字体文件"→渲染端内置
+// 默认字体:本函数是 Resolver 跳过字体物化与渲染后端回退默认字体的**同一口径**
+// (渲染后端据此判定,导出以防两处判定漂移)
+func IsNumeric(s string) bool {
 	_, err := strconv.ParseFloat(s, 64)
 	return err == nil
 }
