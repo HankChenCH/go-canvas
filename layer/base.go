@@ -125,7 +125,14 @@ func (b *base) ContentWidth() int {
 
 // ContentHeight 内容区高度 = 高度 - 上下 padding
 func (b *base) ContentHeight() int {
-	return int(float64(b.height) - b.padding.Top - b.padding.Bottom)
+	return contentHeightOf(b.height, b.padding)
+}
+
+// contentHeightOf 任意动态高 - 上下 padding(向零截断,对齐 PHP intval)。
+// Height() 被覆写的图层(Text/QR)经它派生 ContentHeight,恢复 PHP
+// getContentHeight 经 $this->getHeight() 的动态分派语义
+func contentHeightOf(height int, padding Padding) int {
+	return int(float64(height) - padding.Top - padding.Bottom)
 }
 
 func (b *base) Background() *string     { return b.bgColor }

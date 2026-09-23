@@ -37,6 +37,18 @@ func TestQrCodeHeightFallsBackToWidth(t *testing.T) {
 	}
 }
 
+func TestQrCodeContentHeightUsesDynamicHeight(t *testing.T) {
+	// 内容区高须按动态高(宽度兜底)计算,PHP getContentHeight 经 $this->getHeight()
+	// 动态分派;auto/未声明高度 60、上下 padding 各 5 → 60-10 = 50
+	l := layer.NewQrCodeLayer(
+		layer.WithSize(60, 0), layer.WithAutoHeight(),
+		layer.WithPaddingVH(5, 0), layer.WithQrText("https://example.com"),
+	)
+	if got := l.ContentHeight(); got != 50 {
+		t.Errorf("ContentHeight = %d, want 50", got)
+	}
+}
+
 func TestQrCodeGraphAlwaysCarriesValue(t *testing.T) {
 	// PHP QrCodeLayerTest::testGraphAlwaysCarriesValue:无损,value 与是否已物化无关
 	l := layer.NewQrCodeLayer(layer.WithSize(60, 60))

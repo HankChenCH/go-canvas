@@ -119,6 +119,14 @@ func (l *TextLayer) LineHeightPx() int {
 	return int(math.Ceil(float64(l.fontSize) * l.lineHeight))
 }
 
+// ContentHeight 内容区高度 = 动态高 - 上下 padding。覆写:Height() 有 auto 语义
+// (行数×行高+padding),须按多态结果计算——PHP getContentHeight 经
+// $this->getHeight() 动态分派,基类版读原始字段对 auto 图层是错的
+// (工单10 布局快照 fixture 抓出的移植偏差)
+func (l *TextLayer) ContentHeight() int {
+	return contentHeightOf(l.Height(), l.padding)
+}
+
 // TextOrigin 文本在内容盒内的绘制基准点(对齐 + 行数),纯布局计算,渲染端共用。
 // 返回纯对齐锚点——PHP 的 GD 基线魔数 - round(fontSize*0.1) 不移植(ADR-0003),
 // 基线差由渲染后端 drawText 用字体 metrics 消化;其余分支结构与 PHP 逐条对应

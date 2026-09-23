@@ -46,6 +46,12 @@ func (l *QrCodeLayer) Height() int {
 	return l.Width()
 }
 
+// ContentHeight 内容区高度 = 动态高 - 上下 padding。覆写理由同 TextLayer:
+// Height() 有宽度兜底语义,须按多态结果计算(PHP getContentHeight 动态分派)
+func (l *QrCodeLayer) ContentHeight() int {
+	return contentHeightOf(l.Height(), l.padding)
+}
+
 // TypeName implements Layer
 func (l *QrCodeLayer) TypeName() string { return TypeQrCode }
 

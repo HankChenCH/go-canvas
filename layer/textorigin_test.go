@@ -52,6 +52,19 @@ func TestTextOriginPureAlignmentAnchor(t *testing.T) {
 			x: 0, y: 10,
 		},
 		{
+			// autoHeight + padding + bottom×autowrap:内容盒高必须用动态高
+			//(行数×行高像素+padding,Height() 覆写结果)而非原始 height 字段——
+			// PHP getContentHeight 经 $this->getHeight() 动态分派。7 行、行高 23、
+			// 动态高 169、内容盒高 161:posy = 161-23×(7-1) = 23
+			//(工单10 布局快照 fixture 抓出的移植偏差)
+			name: "auto高底部多行动态内容高",
+			l: layer.NewTextLayer(layer.WithSize(100, 0), layer.WithAutoHeight(),
+				layer.WithText("画布渲染库快照用例第一段超长文本\n\n第二段落继续自动断行"),
+				layer.WithFont("", 16, "#000"), layer.WithLineHeight(1.4),
+				layer.WithPadding(4), layer.WithAutowrap(true)),
+			x: 0, y: 23,
+		},
+		{
 			// 未知对齐值 → 0,0(PHP match default 臂)
 			name: "未知对齐归零",
 			l: layer.NewTextLayer(layer.WithSize(100, 50),
