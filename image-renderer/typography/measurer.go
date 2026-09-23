@@ -12,6 +12,12 @@ import (
 	"github.com/hankchen/go-canvas/text"
 )
 
+// IsBuiltinFont 内置默认字体判定:空串/纯数字字体 id(与核心 resolver.IsNumeric
+// 同口径)。度量与绘制共用本判定,内置语义见 BuiltinFace
+func IsBuiltinFont(fontFile string) bool {
+	return fontFile == "" || resolver.IsNumeric(fontFile)
+}
+
 // OpenTypeMeasurerFactory 真实字体度量器工厂,类型与核心 text.MeasurerFactory
 // 接缝对齐,可直接作 WithMeasurerFactory 实参。字号即像素(DPI 72,与渲染端一致)。
 //
@@ -24,7 +30,7 @@ import (
 // 限单 goroutine 串行使用;工厂每次调用新建独立实例,跨 goroutine 各自经工厂获取。
 // 解析结果(*opentype.Font)进程内缓存共享,Face 构建成本因此摊薄
 func OpenTypeMeasurerFactory(fontFile string, fontSize float64) text.TextMeasurer {
-	if fontFile == "" || resolver.IsNumeric(fontFile) {
+	if IsBuiltinFont(fontFile) {
 		return &OpenTypeMeasurer{face: BuiltinFace()}
 	}
 

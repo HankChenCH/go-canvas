@@ -19,7 +19,6 @@ import (
 
 	"github.com/hankchen/go-canvas/image-renderer/typography"
 	"github.com/hankchen/go-canvas/layer"
-	"github.com/hankchen/go-canvas/resolver"
 )
 
 // fontKey Face 缓存键:字体文件路径 + 字号
@@ -34,7 +33,7 @@ type fontKey struct {
 // 非并发安全);实例可跨多次 Render 复用,缓存随实例存活。
 // fontFile 为空串/纯数字时返回内置默认字体
 func (r *Renderer) sessionFace(fontFile string, fontSize int) (font.Face, error) {
-	if fontFile == "" || resolver.IsNumeric(fontFile) {
+	if typography.IsBuiltinFont(fontFile) {
 		return typography.BuiltinFace(), nil
 	}
 

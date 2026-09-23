@@ -4,31 +4,18 @@ package typography_test
 // 度量/断行/切分各自可独立替换(工单 09 验收)。
 
 import (
-	"os"
-	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
-
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/hankchen/go-canvas/image-renderer/typography"
 	"github.com/hankchen/go-canvas/layer"
 	"github.com/hankchen/go-canvas/text"
 )
 
-// writeTestFont 落盘测试字体并返回路径(measurer_test 同款,此处集成用)
-func writeTestFont(t *testing.T) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "goregular.ttf")
-	if err := os.WriteFile(path, goregular.TTF, 0o600); err != nil {
-		t.Fatalf("写测试字体: %v", err)
-	}
-	return path
-}
-
 func TestTextLayerInjectsEnhancedStack(t *testing.T) {
 	// 完整增强栈:真实度量 + 完整 UAX #14,经既有接缝注入,默认仍是核心对齐版
-	fontPath := writeTestFont(t)
+	fontPath := writeGoRegular(t)
 	l := layer.NewTextLayer(
 		layer.WithSize(80, 0), layer.WithAutoHeight(),
 		layer.WithText("Hello wonderful World"), layer.WithFont(fontPath, 16, "#000"),
@@ -42,7 +29,7 @@ func TestTextLayerInjectsEnhancedStack(t *testing.T) {
 		t.Fatalf("真实度量下 80px 盒应断为多行, got %q", lines)
 	}
 	// 行内容完整(词不被拆碎)且各行宽不超内容盒
-	if got, want := joinLines(lines), "Hello wonderful World"; got != want {
+	if got, want := strings.Join(lines, " "), "Hello wonderful World"; got != want {
 		t.Errorf("断行丢失内容: %q != %q", got, want)
 	}
 	m := typography.OpenTypeMeasurerFactory(fontPath, 16)
@@ -58,7 +45,7 @@ func TestTextLayerInjectsEnhancedStack(t *testing.T) {
 }
 
 func TestEnhancedComponentsIndependentlySwappable(t *testing.T) {
-	fontPath := writeTestFont(t)
+	fontPath := writeGoRegular(t)
 
 	// 增强断行器 + 核心启发式度量:各自可换(度量与断行解耦)
 	heuristic := layer.NewTextLayer(
@@ -83,17 +70,6 @@ func TestEnhancedComponentsIndependentlySwappable(t *testing.T) {
 	if got := mixed.Lines(); !reflect.DeepEqual(got, []string{"Hello", "World"}) {
 		t.Errorf("对齐版断行器×真实度量 Lines() = %q (盒宽 %d)", got, box)
 	}
-}
-
-func joinLines(lines []string) string {
-	out := ""
-	for i, line := range lines {
-		if i > 0 {
-			out += " "
-		}
-		out += line
-	}
-	return out
 }
 
 // 编译期锁定:增强三组件实现的都是核心接缝类型(与各单测的断言互补)

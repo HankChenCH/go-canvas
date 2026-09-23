@@ -24,8 +24,9 @@ func NewUax14LineBreaker() *Uax14LineBreaker { return &Uax14LineBreaker{} }
 
 var _ text.LineBreaker = (*Uax14LineBreaker)(nil)
 
-// mandatoryBreakRunes 强制换行符集合(CR LF 成对给出,按字符集剥离即同时覆盖)
-const mandatoryBreakRunes = "\r\n\u0085\u2028\u2029"
+// mandatoryBreakRunes 强制换行符集合(LF/NL/CR LF/BK 类;CR LF 成对给出,
+// 按字符集剥离即同时覆盖)
+const mandatoryBreakRunes = "\r\n\v\f\u0085\u2028\u2029"
 
 // BreakText implements text.LineBreaker。
 // LineIterator 的行段含行尾空格串与行尾强制换行符本身(UAX #14 断点在空格串后,

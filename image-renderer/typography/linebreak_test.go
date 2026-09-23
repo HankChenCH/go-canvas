@@ -7,12 +7,8 @@ package typography_test
 // 度量用 perRuneMeasurer(每码点 10px),与具体字体无关,断行算术可控。
 
 import (
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
-
-	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/hankchen/go-canvas/image-renderer/typography"
 	"github.com/hankchen/go-canvas/text"
@@ -61,7 +57,10 @@ func TestUax14LineBreaker(t *testing.T) {
 			"UAX #14 识别 CR LF 为一个强制换行;PHP explode 只按 LF 分段,CR 残留行尾"},
 		{"行分隔符 U+2028", "a\u2028b", 100,
 			[]string{"a", "b"}, []string{"a\u2028b"},
-			"UAX #14 识别 LS/NEL 为强制换行;PHP 简化版只认 LF"},
+			"UAX #14 识别 LS/NEL/VT/FF 等强制换行;PHP 简化版只认 LF"},
+		{"VT FF 强制断行", "a\vb", 100,
+			[]string{"a", "b"}, []string{"a\vb"},
+			"UAX #14 BK 类(VT/FF)为强制换行;PHP 简化版只认 LF"},
 		{"行首空格断行产出空行", " a", 10,
 			[]string{"", "a"}, []string{"a"},
 			"UAX #14 在行首空格后允许断行(空行);PHP 简化版定行时不产出空行"},
@@ -90,10 +89,7 @@ func TestUax14LineBreaker(t *testing.T) {
 func TestUax14LineBreakerWithRealFont(t *testing.T) {
 	// 真实字体端到端:盒宽取 goregular 下「Hello Wor」的真实宽度,
 	// 「Hello World」放不下 → 在词边界定行,两行均不超盒
-	path := filepath.Join(t.TempDir(), "goregular.ttf")
-	if err := os.WriteFile(path, goregular.TTF, 0o600); err != nil {
-		t.Fatalf("写测试字体: %v", err)
-	}
+	path := writeGoRegular(t)
 	m := typography.OpenTypeMeasurerFactory(path, 16)
 	box := m.Measure("Hello Wor")
 
