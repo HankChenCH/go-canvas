@@ -1,18 +1,25 @@
 package layer
 
+import "encoding/json"
+
 // graph wire 结构:与 php-canvas-next 各图层 graph() 产物逐字段键级对齐。
 // 结构体字段顺序即 JSON 键序(对齐 PHP 关联数组字面量的写出顺序)。
 
 // ValueTypeStatic data.valueType 的静态取值标识
 const ValueTypeStatic = "StaticValue"
 
-// Node 图层在 graph 中的 wire 节点。data 等类型专属键仅由对应图层类型写出
-// (图片图层恒有 data;表格容器 rows/cells/content 键属工单 03)。
+// Node 图层在 graph 中的 wire 节点。类型专属键仅由对应图层类型写出:
+// data 属图片/文本/二维码图层,rows/cells/content 属对应表格容器——
+// 非 nil 才写出(空容器也恒写键,见各容器 Graph);Content 以 RawMessage
+// 承载以区分"键存在为 null"(空单元格)与"键缺省"(非容器)。
 type Node struct {
-	Type     string `json:"type"`
-	Priority int    `json:"priority"`
-	Spec     Spec   `json:"spec"`
-	Data     *Data  `json:"data,omitempty"`
+	Type     string          `json:"type"`
+	Priority int             `json:"priority"`
+	Spec     Spec            `json:"spec"`
+	Data     *Data           `json:"data,omitempty"`
+	Rows     *[]Node         `json:"rows,omitempty"`
+	Cells    *[]Node         `json:"cells,omitempty"`
+	Content  json.RawMessage `json:"content,omitempty"`
 }
 
 // Spec 图层公共规格:形状 / 对齐 / 定位;文本图层追加 fontFamily 键
@@ -81,8 +88,8 @@ type Position struct {
 	Position string `json:"position"`
 }
 
-// Data 图层业务数据。图片图层仅 valueType/value 两键——无 expression 预留键,
-// 与 PHP 字节面一致;文本/二维码图层恒写 expression 空串占位(表达式引擎不存在,
+// Data 图层业务数据。图片/二维码图层仅 valueType/value 两键——无 expression 预留键,
+// 与 PHP 字节面一致;文本图层恒写 expression 空串占位(表达式引擎不存在,
 // 仅保留 wire 字段,PHP 同款)
 type Data struct {
 	ValueType  string  `json:"valueType"`

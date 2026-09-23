@@ -1,7 +1,7 @@
 package canvas_test
 
-// CanvasTest 平移。PHP testFromGraphRoundtripWithNestedTable 含文本/二维码/表格嵌套,
-// 对应类型属工单 02/03;本工单以多图片图层的画布级往返承载,完整平移待 02/03 落地后补全。
+// CanvasTest 平移。嵌套往返用例已随工单 02/03 落地补全为 PHP 原版
+// testFromGraphRoundtripWithNestedTable(文本/二维码/表格嵌套)。
 
 import (
 	"encoding/json"
@@ -100,26 +100,43 @@ func TestGetLayersReturnsCopy(t *testing.T) {
 	}
 }
 
-func TestFromGraphRoundtrip(t *testing.T) {
-	// PHP CanvasTest::testFromGraphRoundtrip(画布级嵌套适配版:工单 01 仅图片图层)
-	cover := layer.NewImageLayer(
-		layer.WithSize(100, 100),
-		layer.WithBackground("#f00"),
-		layer.WithImage("a.png"),
-		layer.WithPriority(1),
-	)
-	fore := layer.NewImageLayer(
-		layer.WithSize(30, 20),
+func TestFromGraphRoundtripWithNestedTable(t *testing.T) {
+	// PHP CanvasTest::testFromGraphRoundtripWithNestedTable(工单 03 补全:文本/二维码/表格嵌套)
+	row := layer.NewTableRowLayer(layer.WithSize(100, 0), layer.WithAutoHeight())
+	cell := layer.NewTableCellLayer(layer.WithSize(100, 20), layer.WithBackground("#eee"))
+	cell.AddContentLayer(layer.NewTextLayer(
+		layer.WithSize(100, 0),
 		layer.WithAutoHeight(),
-		layer.WithLineHeight(1.5),
-		layer.WithPaddingTHB(1, 2, 3),
-		layer.WithBorder(2, "#123456"),
-		layer.WithPosition(3, 4, "bottom-right"),
-		layer.WithImage("b.png"),
-		layer.WithPriority(3),
-	)
+		layer.WithText("表格文本"),
+		layer.WithFont("", 10, "#000"),
+	))
+	row.AddCell(cell)
 
-	c := canvas.New(100, 100, cover, fore)
+	c := canvas.New(100, 100,
+		layer.NewImageLayer(
+			layer.WithSize(100, 100),
+			layer.WithBackground("#f00"),
+			layer.WithImage("a.png"),
+			layer.WithPriority(1),
+		),
+		layer.NewTextLayer(
+			layer.WithSize(100, 30),
+			layer.WithText("标题"),
+			layer.WithFont("", 12, "#000"),
+			layer.WithPriority(3),
+		),
+		layer.NewQrCodeLayer(
+			layer.WithSize(20, 20),
+			layer.WithQrText("https://example.com"),
+			layer.WithPriority(2),
+		),
+		layer.NewTableLayer(
+			layer.WithSize(100, 20),
+			layer.WithBackground("#fff"),
+			layer.WithRows(row),
+			layer.WithPriority(0),
+		),
+	)
 
 	// graph → JSON → 解码 → 重建 → graph 恒等(wire 面走真实 JSON 解码)
 	var g canvas.Graph
@@ -134,8 +151,8 @@ func TestFromGraphRoundtrip(t *testing.T) {
 	if got, want := jsonOf(t, rebuilt.Graph()), jsonOf(t, c.Graph()); got != want {
 		t.Errorf("画布往返 graph 不恒等:\n got  %s\n want %s", got, want)
 	}
-	if n := len(rebuilt.GetLayers()); n != 2 {
-		t.Errorf("重建图层数 = %d, want 2", n)
+	if n := len(rebuilt.GetLayers()); n != 4 {
+		t.Errorf("重建图层数 = %d, want 4", n)
 	}
 }
 

@@ -9,12 +9,19 @@ import (
 )
 
 // 图层类型标识(graph.type):与 PHP 类名常量同名,跨端固定。
-// 二维码/表格类型属工单 03,落地时在此追加。
 const (
 	// TypeImage 图片图层
 	TypeImage = "ImageLayer"
 	// TypeText 文本图层
 	TypeText = "TextLayer"
+	// TypeQrCode 二维码图层
+	TypeQrCode = "QrCodeLayer"
+	// TypeTable 表格图层(行容器)
+	TypeTable = "TableLayer"
+	// TypeTableRow 表格行图层(单元格容器)
+	TypeTableRow = "TableRowLayer"
+	// TypeTableCell 表格单元格图层(内容层包装)
+	TypeTableCell = "TableCellLayer"
 )
 
 // ErrUnknownLayerType graph 解码遇未知图层类型(消息含类型名)
@@ -37,6 +44,14 @@ func FromGraph(n Node) (Layer, error) {
 		return ImageFromGraph(n), nil
 	case TypeText:
 		return TextFromGraph(n), nil
+	case TypeQrCode:
+		return QrCodeFromGraph(n), nil
+	case TypeTable:
+		return TableFromGraph(n)
+	case TypeTableRow:
+		return TableRowFromGraph(n)
+	case TypeTableCell:
+		return TableCellFromGraph(n)
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnknownLayerType, n.Type)
 	}

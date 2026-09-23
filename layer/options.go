@@ -11,8 +11,12 @@ import (
 // baseOpt 公共图层选项:作用于任意图层共享的盒模型/对齐/定位设定
 type baseOpt func(*base)
 
-func (f baseOpt) applyImage(l *ImageLayer) { f(&l.base) }
-func (f baseOpt) applyText(l *TextLayer)   { f(&l.base) }
+func (f baseOpt) applyImage(l *ImageLayer)         { f(&l.base) }
+func (f baseOpt) applyText(l *TextLayer)           { f(&l.base) }
+func (f baseOpt) applyQrCode(l *QrCodeLayer)       { f(&l.base) }
+func (f baseOpt) applyTable(l *TableLayer)         { f(&l.base) }
+func (f baseOpt) applyTableRow(l *TableRowLayer)   { f(&l.base) }
+func (f baseOpt) applyTableCell(l *TableCellLayer) { f(&l.base) }
 
 // imageOpt 图片图层专属选项
 type imageOpt func(*ImageLayer)
@@ -29,6 +33,38 @@ func (f textOpt) applyText(l *TextLayer) { f(l) }
 
 // textLayerOpt 文本图层构造选项(公共 + 文本专属)
 type textLayerOpt interface{ applyText(*TextLayer) }
+
+// qrCodeOpt 二维码图层专属选项
+type qrCodeOpt func(*QrCodeLayer)
+
+func (f qrCodeOpt) applyQrCode(l *QrCodeLayer) { f(l) }
+
+// qrCodeLayerOpt 二维码图层构造选项(公共 + 二维码专属)
+type qrCodeLayerOpt interface{ applyQrCode(*QrCodeLayer) }
+
+// tableOpt 表格图层专属选项
+type tableOpt func(*TableLayer)
+
+func (f tableOpt) applyTable(l *TableLayer) { f(l) }
+
+// tableLayerOpt 表格图层构造选项(公共 + 表格专属)
+type tableLayerOpt interface{ applyTable(*TableLayer) }
+
+// tableRowOpt 表格行图层专属选项
+type tableRowOpt func(*TableRowLayer)
+
+func (f tableRowOpt) applyTableRow(l *TableRowLayer) { f(l) }
+
+// tableRowLayerOpt 表格行图层构造选项(公共 + 行专属)
+type tableRowLayerOpt interface{ applyTableRow(*TableRowLayer) }
+
+// tableCellOpt 表格单元格图层专属选项
+type tableCellOpt func(*TableCellLayer)
+
+func (f tableCellOpt) applyTableCell(l *TableCellLayer) { f(l) }
+
+// tableCellLayerOpt 表格单元格图层构造选项(公共 + 单元格专属)
+type tableCellLayerOpt interface{ applyTableCell(*TableCellLayer) }
 
 // WithSize 声明尺寸;会清除 auto 标志
 func WithSize(width, height int) baseOpt {
@@ -166,4 +202,32 @@ func WithLineBreaker(breaker text.LineBreaker) textOpt {
 // WithMeasurerFactory 覆写默认度量器工厂(Canvas 级统一切换度量策略时使用)
 func WithMeasurerFactory(factory text.MeasurerFactory) textOpt {
 	return func(l *TextLayer) { l.measurerFactory = factory }
+}
+
+// WithQrText 二维码内容(PHP setText 的选项形态)
+func WithQrText(text string) qrCodeOpt {
+	return func(l *QrCodeLayer) { l.SetText(text) }
+}
+
+// WithRows 批量收纳行:内部走同一条 AddRow 路径(行宽同步、内容盒高累加)
+func WithRows(rows ...*TableRowLayer) tableOpt {
+	return func(l *TableLayer) {
+		for _, r := range rows {
+			l.AddRow(r)
+		}
+	}
+}
+
+// WithCells 批量收纳单元格:内部走同一条 AddCell 路径(行高取最高)
+func WithCells(cells ...*TableCellLayer) tableRowOpt {
+	return func(l *TableRowLayer) {
+		for _, c := range cells {
+			l.AddCell(c)
+		}
+	}
+}
+
+// WithContent 包装内容层:内部走同一条 AddContentLayer 路径(尺寸同步/压平/采纳)
+func WithContent(content contentLayer) tableCellOpt {
+	return func(l *TableCellLayer) { l.AddContentLayer(content) }
 }
