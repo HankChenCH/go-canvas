@@ -72,6 +72,43 @@ func TestGraphKeepsRawValue(t *testing.T) {
 	}
 }
 
+// TestImageOrigin 图片在内容盒内的放置起点(渲染模板 paintImage 消费)。
+// PHP 无专属用例,按 getImageOrigin 的 match 分支语义逐臂锁定:left → padding.left、
+// center → (宽-内容宽)/2、right → 宽-内容宽(default 臂归 0),垂直同构
+func TestImageOrigin(t *testing.T) {
+	cases := []struct {
+		name         string
+		horizontal   string
+		vertical     string
+		padT, padR   float64
+		padB, padL   float64
+		wantX, wantY int
+	}{
+		// 尺寸 100×60、padding 左15右5/上7下3:内容盒 80×50,
+		// 水平 left=15 / center=10 / right=20,垂直 top=7 / center=5 / bottom=10
+		{"center-center 默认", "center", "center", 7, 5, 3, 15, 10, 5},
+		{"left-top 取 padding", "left", "top", 7, 5, 3, 15, 15, 7},
+		{"right-bottom 取宽高差", "right", "bottom", 7, 5, 3, 15, 20, 10},
+		// 未知取值归 0(PHP match default 臂,不取 padding)
+		{"未知取值归零", "diagonal", "middle", 7, 5, 3, 15, 0, 0},
+		// 整除向零截断:(100-97)/2=1.5 → 1
+		{"除不尽向零截断", "center", "center", 0, 3, 0, 0, 1, 0},
+	}
+
+	for _, tc := range cases {
+		l := layer.NewImageLayer(
+			layer.WithSize(100, 60),
+			layer.WithPaddingTRBL(tc.padT, tc.padR, tc.padB, tc.padL),
+			layer.WithHorizontalAlign(tc.horizontal),
+			layer.WithVerticalAlign(tc.vertical),
+		)
+		x, y := l.ImageOrigin()
+		if x != tc.wantX || y != tc.wantY {
+			t.Errorf("%s: ImageOrigin() = (%d, %d), want (%d, %d)", tc.name, x, y, tc.wantX, tc.wantY)
+		}
+	}
+}
+
 func TestFromGraphRoundtrip(t *testing.T) {
 	// PHP ImageLayerTest::testFromGraphRoundtrip
 	l := layer.NewImageLayer(

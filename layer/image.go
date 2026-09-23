@@ -52,6 +52,32 @@ func (l *ImageLayer) ResolvedSrc() *string {
 	return l.rawImg
 }
 
+// ImageOrigin 图片在内容盒内的放置起点(对齐 + padding),纯布局计算,渲染端共用。
+// 未知取值归 0(PHP match default 臂);整除向零截断,对齐 PHP intval
+func (l *ImageLayer) ImageOrigin() (int, int) {
+	posx := 0
+	switch l.horizontalAlign {
+	case AlignLeft:
+		posx = int(l.padding.Left)
+	case AlignCenter:
+		posx = int(float64(l.Width()-l.ContentWidth()) / 2)
+	case AlignRight:
+		posx = l.Width() - l.ContentWidth()
+	}
+
+	posy := 0
+	switch l.verticalAlign {
+	case AlignTop:
+		posy = int(l.padding.Top)
+	case AlignCenter:
+		posy = int(float64(l.Height()-l.ContentHeight()) / 2)
+	case AlignBottom:
+		posy = l.Height() - l.ContentHeight()
+	}
+
+	return posx, posy
+}
+
 // TypeName implements Layer
 func (l *ImageLayer) TypeName() string { return TypeImage }
 
