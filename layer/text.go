@@ -99,7 +99,9 @@ func (l *TextLayer) Height() int {
 	return paddingHeight
 }
 
-// Lines 断行结果(纯布局函数):autowrap 开启时按内容盒宽断行,否则整段单行(含空文本)
+// Lines 断行结果(纯布局函数):autowrap 开启时按内容盒宽断行,否则整段单行(含空文本)。
+// 度量工厂的字体值传 ResolvedFont():真实字体度量需要物化后的本地路径才能加载,
+// 未物化时回落原始值(启发式工厂忽略字体值,两种口径无观察差异)
 func (l *TextLayer) Lines() []string {
 	if !l.autowrap {
 		return []string{l.text}
@@ -108,7 +110,7 @@ func (l *TextLayer) Lines() []string {
 	return l.lineBreaker.BreakText(
 		l.text,
 		float64(l.ContentWidth()),
-		l.measurerFactory(l.font, float64(l.fontSize)),
+		l.measurerFactory(l.ResolvedFont(), float64(l.fontSize)),
 	)
 }
 

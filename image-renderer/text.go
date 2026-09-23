@@ -1,24 +1,23 @@
 package imagerenderer
 
-// 文本绘制原语:字体加载(TTF/OTF/TTC)、Face 会话持有、对齐锚点落笔、角度旋转。
-// (x, y) 为对齐语义锚点——水平按真实文本宽度(advance+kern)对齐,垂直用字体
-// metrics(ascent/descent)把基线落到锚点语义对应位置;布局层只返回纯对齐锚点,
-// 字体基线差统一在渲染端消化(ADR-0003,PHP 的 GD 基线魔数不移植)。
+// 文本绘制原语:Face 会话持有、对齐锚点落笔、角度旋转。字体加载统一在
+// typography 包(TTF/OTF/TTC 分派 + 解析缓存 + 内置默认字体,本 module 唯一
+// 加载入口)。(x, y) 为对齐语义锚点——水平按真实文本宽度(advance+kern)对齐,
+// 垂直用字体 metrics(ascent/descent)把基线落到锚点语义对应位置;布局层只返回
+// 纯对齐锚点,字体基线差统一在渲染端消化(ADR-0003,PHP 的 GD 基线魔数不移植)。
 
 import (
 	"fmt"
 	"image"
 	"image/color"
 	"math"
-	"os"
 
 	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/basicfont"
-	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/f64"
 	"golang.org/x/image/math/fixed"
 
+	"github.com/hankchen/go-canvas/image-renderer/typography"
 	"github.com/hankchen/go-canvas/layer"
 	"github.com/hankchen/go-canvas/resolver"
 )
@@ -36,7 +35,7 @@ type fontKey struct {
 // fontFile 为空串/纯数字时返回内置默认字体
 func (r *Renderer) sessionFace(fontFile string, fontSize int) (font.Face, error) {
 	if fontFile == "" || resolver.IsNumeric(fontFile) {
-		return builtinFontFace(), nil
+		return typography.BuiltinFace(), nil
 	}
 
 	key := fontKey{fontFile, fontSize}
@@ -44,7 +43,7 @@ func (r *Renderer) sessionFace(fontFile string, fontSize int) (font.Face, error)
 		return f, nil
 	}
 
-	f, err := loadFontFace(fontFile, fontSize)
+	f, err := typography.LoadFontFace(fontFile, float64(fontSize))
 	if err != nil {
 		return nil, err
 	}
@@ -53,56 +52,6 @@ func (r *Renderer) sessionFace(fontFile string, fontSize int) (font.Face, error)
 	}
 	r.faces[key] = f
 	return f, nil
-}
-
-// builtinFontFace 内置默认字体:Go 侧没有 GD 内置字体的对应物,空字体/纯数字
-// id 的"内置默认字体语义"取 x/image 自带的 7×13 点阵 basicfont 兜底——
-// 零新增依赖;但仅覆盖 ASCII 且字号参数无效(点阵字体无缩放),CJK 文本必须
-// 显式提供真实字体文件。basicfont 的实现无内部状态,单例共享安全
-func builtinFontFace() font.Face {
-	return basicfont.Face7x13
-}
-
-// loadFontFace 加载字体文件为绘制 Face:扩展名不可信,按 magic bytes 分派——
-// "ttcf" 集合走 opentype.ParseCollection 取首个 face,TTF/OTF 单体走
-// opentype.Parse;DPI 固定 72(1pt = 1px,字号即像素)
-func loadFontFace(path string, fontSize int) (font.Face, error) {
-	if fontSize <= 0 {
-		return nil, fmt.Errorf("字号非法: %d", fontSize)
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("读取字体 %s: %w", path, err)
-	}
-
-	var parsed *opentype.Font
-	if len(data) >= 4 && string(data[:4]) == "ttcf" {
-		collection, err := opentype.ParseCollection(data)
-		if err != nil {
-			return nil, fmt.Errorf("解析字体集 %s: %w", path, err)
-		}
-		// 集合字体取首个 face(文档化语义,不暴露 face 选择)
-		parsed, err = collection.Font(0)
-		if err != nil {
-			return nil, fmt.Errorf("取字体集首 face %s: %w", path, err)
-		}
-	} else {
-		parsed, err = opentype.Parse(data)
-		if err != nil {
-			return nil, fmt.Errorf("解析字体 %s: %w", path, err)
-		}
-	}
-
-	face, err := opentype.NewFace(parsed, &opentype.FaceOptions{
-		Size:    float64(fontSize),
-		DPI:     72,
-		Hinting: font.HintingNone,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("构建字体 Face %s: %w", path, err)
-	}
-	return face, nil
 }
 
 // DrawText implements renderer.Backend:空行零副作用(PHP 同款空串守卫);

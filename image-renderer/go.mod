@@ -7,6 +7,7 @@ go 1.25.0
 replace github.com/hankchen/go-canvas => ../
 
 require (
+	github.com/go-text/typesetting v0.3.5
 	github.com/hankchen/go-canvas v0.0.0-00010101000000-000000000000
 	github.com/yeqown/go-qrcode/v2 v2.3.0
 	github.com/yeqown/go-qrcode/writer/standard v1.4.0

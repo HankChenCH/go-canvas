@@ -139,6 +139,32 @@ func TestTextMeasurerFactoryInjectable(t *testing.T) {
 	}
 }
 
+func TestTextMeasurerFactoryReceivesResolvedFont(t *testing.T) {
+	// 工单 09 适配:真实字体度量必须拿到物化后的本地路径才能加载字体——
+	// Lines() 传给度量工厂的字体值是 ResolvedFont()(物化优先,未物化回落原始值);
+	// 默认启发式工厂忽略字体值,该口径对其无观察差异
+	var gotFont string
+	capture := func(fontFile string, _ float64) text.TextMeasurer {
+		gotFont = fontFile
+		return fixedMeasurer(10)
+	}
+
+	l := layer.NewTextLayer(layer.WithSize(100, 0), layer.WithText("文本"),
+		layer.WithFont("https://cdn.example.com/msyh.ttf", 12, "#000"),
+		layer.WithAutowrap(true),
+		layer.WithMeasurerFactory(capture))
+	l.Lines()
+	if gotFont != "https://cdn.example.com/msyh.ttf" {
+		t.Errorf("未物化时工厂收到字体 = %q, want 原始值", gotFont)
+	}
+
+	l.SetResolvedFont("/cache/go-canvas/fonts/msyh.ttf")
+	l.Lines()
+	if gotFont != "/cache/go-canvas/fonts/msyh.ttf" {
+		t.Errorf("物化后工厂收到字体 = %q, want 物化路径", gotFont)
+	}
+}
+
 func TestTextGraphKeepsFullFontValue(t *testing.T) {
 	// PHP TextLayerTest::testGraphKeepsFullFontValue:无损——font 保留完整原始值
 	// (旧库只存 basename);data 恒含 expression 空串占位(PHP 字节面)
