@@ -83,13 +83,13 @@ func TestPickFontMissingGivesClearHint(t *testing.T) {
 }
 
 func TestBuildSampleArrangesContent(t *testing.T) {
-	c, err := buildSample(testFont(t))
+	c, _, err := buildSample(testFont(t))
 	if err != nil {
 		t.Fatalf("buildSample: %v", err)
 	}
 
-	if c.Width() != 400 || c.Height() != 400 {
-		t.Fatalf("画布 = %dx%d, want 400x400", c.Width(), c.Height())
+	if c.Width() != 400 || c.Height() != 460 { // V2 模板表样例区加高(工票 12)
+		t.Fatalf("画布 = %dx%d, want 400x460(V2 模板表样例区加高,工票 12)", c.Width(), c.Height())
 	}
 
 	// priority 叠加:降序 [白底 11, 头图 10, 标题 5, 段落/表格/二维码/条带/页脚 4…],
@@ -101,11 +101,13 @@ func TestBuildSampleArrangesContent(t *testing.T) {
 		gotTypes = append(gotTypes, l.TypeName())
 		gotPriorities = append(gotPriorities, l.Priority())
 	}
+	// V2 段(工票 12):bgV2 垫底 ImageLayer + 末尾模板表 TableLayer
 	wantTypes := []string{
-		layer.TypeImage, layer.TypeImage, layer.TypeText, layer.TypeText,
+		layer.TypeImage, layer.TypeImage, layer.TypeImage, layer.TypeText, layer.TypeText,
 		layer.TypeTable, layer.TypeQrCode, layer.TypeImage, layer.TypeText,
+		layer.TypeTable,
 	}
-	wantPriorities := []int{11, 10, 5, 4, 4, 4, 4, 4}
+	wantPriorities := []int{11, 11, 10, 5, 4, 4, 4, 4, 4, 4}
 	if !reflect.DeepEqual(gotTypes, wantTypes) {
 		t.Errorf("图层类型序 = %v, want %v", gotTypes, wantTypes)
 	}
@@ -113,11 +115,13 @@ func TestBuildSampleArrangesContent(t *testing.T) {
 		t.Errorf("priority 序 = %v, want %v", gotPriorities, wantPriorities)
 	}
 
-	// 嵌套 auto 高度链:行高取最高单元格(内容行高+padding),表高 = 行高累计
+	// 嵌套 auto 高度链:行高取最高单元格(内容行高+padding),表高 = 行高累计。
+	// 取第一个 TableLayer(版式表;末位为 V2 模板表样例)
 	var table *layer.TableLayer
 	for _, l := range layers {
 		if tl, ok := l.(*layer.TableLayer); ok {
 			table = tl
+			break
 		}
 	}
 	if table == nil {
@@ -129,7 +133,7 @@ func TestBuildSampleArrangesContent(t *testing.T) {
 }
 
 func TestRenderSampleSmoke(t *testing.T) {
-	c, err := buildSample(testFont(t))
+	c, _, err := buildSample(testFont(t))
 	if err != nil {
 		t.Fatalf("buildSample: %v", err)
 	}
@@ -144,8 +148,8 @@ func TestRenderSampleSmoke(t *testing.T) {
 	if !ok {
 		t.Fatalf("产物类型 %T, want *image.NRGBA", product)
 	}
-	if img.Bounds().Dx() != 400 || img.Bounds().Dy() != 400 {
-		t.Fatalf("产物 = %dx%d, want 400x400", img.Bounds().Dx(), img.Bounds().Dy())
+	if img.Bounds().Dx() != 400 || img.Bounds().Dy() != 460 { // V2 样例区加高
+		t.Fatalf("产物 = %dx%d, want 400x460(V2 模板表样例区加高,工票 12)", img.Bounds().Dx(), img.Bounds().Dy())
 	}
 
 	// 落盘产物:PNG 魔数 + 可解码
@@ -164,7 +168,7 @@ func TestRenderSampleSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatalf("产物不可解码: %v", err)
 	}
-	if decoded.Bounds().Dx() != 400 || decoded.Bounds().Dy() != 400 {
-		t.Fatalf("解码产物 = %dx%d, want 400x400", decoded.Bounds().Dx(), decoded.Bounds().Dy())
+	if decoded.Bounds().Dx() != 400 || decoded.Bounds().Dy() != 460 { // V2 样例区加高
+		t.Fatalf("解码产物 = %dx%d, want 400x460(V2 模板表样例区加高,工票 12)", decoded.Bounds().Dx(), decoded.Bounds().Dy())
 	}
 }

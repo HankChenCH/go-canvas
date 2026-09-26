@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/hankchen/go-canvas/canvas"
+	"github.com/hankchen/go-canvas/expand"
 	"github.com/hankchen/go-canvas/image-renderer"
 	"github.com/hankchen/go-canvas/image-renderer/typography"
 	"github.com/hankchen/go-canvas/layer"
@@ -56,12 +57,18 @@ func run(ctx context.Context, args []string, stdout io.Writer) error {
 		output = args[0]
 	}
 
-	c, err := buildSample(font)
+	c, dataset, err := buildSample(font)
 	if err != nil {
 		return err
 	}
 
-	product, err := imagerenderer.NewRenderer(nil).Render(ctx, c)
+	// 标准管线(spec §0):渲染前独立展开步骤 + 渲染期惰性物化
+	expanded, err := expand.NewExpander(nil).Expand(c, dataset)
+	if err != nil {
+		return fmt.Errorf("展开样图: %w", err)
+	}
+
+	product, err := imagerenderer.NewRenderer(nil).Render(ctx, expanded)
 	if err != nil {
 		return fmt.Errorf("渲染样图: %w", err)
 	}
@@ -102,8 +109,9 @@ func pickFont(candidates []string) (string, error) {
 }
 
 // buildSample 构造综合样图:内容复刻 PHP 版 visual-check(版式几何逐项一致,
-// 品牌字样与二维码内容按 go-canvas 改写,见 docs/visual-check.md 双端对照节)
-func buildSample(font string) (*canvas.Canvas, error) {
+// 品牌字样与二维码内容按 go-canvas 改写,见 docs/visual-check.md 双端对照节)。
+// V2 段 = 声明态模板表(工票 12),经标准管线 Render(expand(canvas, dataset)) 出图
+func buildSample(font string) (*canvas.Canvas, map[string]any, error) {
 	// 白色底(最垫底),避免透明区域
 	bg := layer.NewImageLayer(
 		layer.WithSize(400, 400), layer.WithBackground("#ffffff"), layer.WithPriority(11),
@@ -145,7 +153,7 @@ func buildSample(font string) (*canvas.Canvas, error) {
 	// 图片图层:本地生成一张双色 PNG(#e8f0e8 底 + #6dc287 色块)
 	stripPath := filepath.Join(os.TempDir(), "go-canvas-visual-strip.png")
 	if err := writeStripPNG(stripPath); err != nil {
-		return nil, fmt.Errorf("生成条带图: %w", err)
+		return nil, nil, fmt.Errorf("生成条带图: %w", err)
 	}
 	strip := layer.NewImageLayer(
 		layer.WithSize(360, 40), layer.WithBackground("#ffffff"), layer.WithImage(stripPath),
@@ -160,7 +168,57 @@ func buildSample(font string) (*canvas.Canvas, error) {
 		layer.WithPosition(0, 370), layer.WithPriority(4),
 	)
 
-	return canvas.New(400, 400, bg, header, title, paragraph, table, qrCode, strip, footer), nil
+	// V2 模板表(声明态,渲染前经 expand(dataset) 实例化)
+	templateTable := buildTemplateTable(font)
+
+	bgV2 := layer.NewImageLayer(
+		layer.WithSize(400, 60), layer.WithBackground("#ffffff"),
+		layer.WithPosition(0, 400), layer.WithPriority(11),
+	)
+
+	return canvas.New(400, 460, bg, bgV2, header, title, paragraph, table, qrCode, strip, footer,
+		templateTable), map[string]any{
+		"items": []any{map[string]any{"name": "V2 模板行", "desc": "template × dataset → expand → render"}},
+	}, nil
+}
+
+// buildTemplateTable V2 模板表样例:单行循环体声明(格表达式 {{row.*}}),
+// 渲染前经 expand 实例化——目验面 = 行上下文求值与 V1 高度耦合重放
+func buildTemplateTable(font string) *layer.TableLayer {
+	nameContent := layer.NewTextLayer(
+		layer.WithSize(120, 0), layer.WithAutoHeight(),
+		layer.WithFont(font, 12, "#222222"), layer.WithPadding(6),
+	)
+	nameContent.SetExpression("{{row.name}}")
+	nameCell := layer.NewTableCellLayer(
+		layer.WithSize(120, 0), layer.WithAutoHeight(),
+		layer.WithBackground("#eef3fd"), layer.WithBorder(1, "#dddddd"),
+	)
+	nameCell.AddTemplateContentLayer(nameContent)
+
+	descContent := layer.NewTextLayer(
+		layer.WithSize(240, 0), layer.WithAutoHeight(),
+		layer.WithFont(font, 12, "#222222"), layer.WithPadding(6),
+	)
+	descContent.SetExpression("{{row.desc}}")
+	descCell := layer.NewTableCellLayer(
+		layer.WithSize(240, 40),
+		layer.WithBackground("#ffffff"), layer.WithBorder(1, "#dddddd"),
+	)
+	descCell.AddTemplateContentLayer(descContent)
+
+	template := layer.NewTableRowTemplate(layer.WithAutoHeight())
+	template.AddCell(nameCell)
+	template.AddCell(descCell)
+
+	table := layer.NewTableLayer(
+		layer.WithSize(360, 50),
+		layer.WithBackground("#ffffff"), layer.WithPosition(20, 405), layer.WithPriority(4),
+		layer.WithBorder(1, "#dddddd"),
+	)
+	table.SetRowsPath("items")
+	table.SetTemplate(template)
+	return table
 }
 
 // buildTable 表格:三行两列。行高 auto 取最高单元格、表高 = 行高累计——
