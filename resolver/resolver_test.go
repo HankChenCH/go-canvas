@@ -151,9 +151,10 @@ func TestImageDownloadFailureReportsURL(t *testing.T) {
 
 	l := layer.NewImageLayer(layer.WithSize(10, 10), layer.WithImage("https://cdn.example.com/missing.png"))
 	err := r.ResolveLayer(context.Background(), l)
-	if err == nil || !errors.Is(err, resolver.ErrRemoteFetchFailed) ||
+	// 工票 12(Q5 决议):绘制期错误 code 化,消息形态「code + 上下文」对齐 PHP
+	if err == nil || !errors.Is(err, resolver.ErrResourceDownloadFailed) ||
 		!strings.Contains(err.Error(), "https://cdn.example.com/missing.png") {
-		t.Errorf("err = %v, want ErrRemoteFetchFailed 且消息含 URL", err)
+		t.Errorf("err = %v, want ErrResourceDownloadFailed 且消息含 URL", err)
 	}
 }
 

@@ -23,9 +23,17 @@ import (
 	"github.com/hankchen/go-canvas/layer"
 )
 
-// ErrRemoteFetchFailed 下载失败哨兵(文本对齐 PHP 异常消息,便于双端日志互查):
-// 经 %w 包装,可 errors.Is 判定,消息体恒含目标 URL
-var ErrRemoteFetchFailed = errors.New("could not get remote file")
+// 绘制期错误稳定 code(spec §5.2,三端一致性抓手:消息可本地化,code 稳定;
+// PHP 侧对位 MaterializeException.getErrorCode,errors.Is 判定,消息形态
+// 「code + 上下文」与 PHP 一致,双端日志可互查)
+var (
+	// ErrResourceDownloadFailed 远程资源下载失败/空响应
+	ErrResourceDownloadFailed = errors.New("resource_download_failed")
+	// ErrResourceSaveFailed 物化产物落盘失败(含缓存目录不可写,PHP 同款归类)
+	ErrResourceSaveFailed = errors.New("resource_save_failed")
+	// ErrQRGenerateFailed QR 生成/落盘失败
+	ErrQRGenerateFailed = errors.New("qr_generate_failed")
+)
 
 // ErrQRMaterializerRequired 二维码物化缝未接线(ADR-0002):核心只定义接口,
 // 固定选项实现在 M2 渲染后端 module,组装时经 WithQRMaterializer 注入。
@@ -170,10 +178,10 @@ func (r *ResourceResolver) materializeQrCode(ctx context.Context, l *layer.QrCod
 	if !fileExists(p) {
 		png, err := r.qr.Materialize(ctx, l.Text(), l.Width())
 		if err != nil {
-			return fmt.Errorf("二维码物化失败(%s): %w", l.Text(), err)
+			return fmt.Errorf("%w: qr code generate failed(%s): %w", ErrQRGenerateFailed, l.Text(), err)
 		}
 		if err := os.WriteFile(p, png, 0o644); err != nil {
-			return fmt.Errorf("qr code save to tmp path failed: %s: %w", p, err)
+			return fmt.Errorf("%w: qr code save to tmp path failed: %s: %w", ErrQRGenerateFailed, p, err)
 		}
 	}
 	l.SetResolvedSrc(p)
@@ -196,13 +204,13 @@ func (r *ResourceResolver) cachedRemoteFile(ctx context.Context, sub, rawURL str
 	content, err := r.downloader.Download(ctx, rawURL)
 	if err != nil {
 		// 双 %w:哨兵供 errors.Is 判定,底层错误(取消/超时等)不丢失
-		return "", fmt.Errorf("%w(%s): %w", ErrRemoteFetchFailed, rawURL, err)
+		return "", fmt.Errorf("%w: could not get remote file(%s): %w", ErrResourceDownloadFailed, rawURL, err)
 	}
 	if len(content) == 0 {
-		return "", fmt.Errorf("%w(%s)", ErrRemoteFetchFailed, rawURL)
+		return "", fmt.Errorf("%w: could not get remote file(%s)", ErrResourceDownloadFailed, rawURL)
 	}
 	if err := os.WriteFile(p, content, 0o644); err != nil {
-		return "", fmt.Errorf("remote file(%s) save to tmp path failed: %w", rawURL, err)
+		return "", fmt.Errorf("%w: remote file(%s) save to tmp path failed: %w", ErrResourceSaveFailed, rawURL, err)
 	}
 	return p, nil
 }
@@ -214,14 +222,14 @@ func (r *ResourceResolver) ensureCacheDir(sub string) (string, error) {
 	if root == "" {
 		userDir, err := os.UserCacheDir()
 		if err != nil {
-			return "", fmt.Errorf("定位系统缓存目录失败: %w", err)
+			return "", fmt.Errorf("%w: 定位系统缓存目录失败: %w", ErrResourceSaveFailed, err)
 		}
 		root = filepath.Join(userDir, "go-canvas")
 	}
 
 	dir := filepath.Join(root, sub)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("缓存目录不可写(%s): %w", dir, err)
+		return "", fmt.Errorf("%w: tmp path can not writable: %s: %w", ErrResourceSaveFailed, dir, err)
 	}
 	return dir, nil
 }

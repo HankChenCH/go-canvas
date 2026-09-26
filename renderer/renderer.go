@@ -16,7 +16,8 @@ import (
 // Renderer 渲染器契约:渲染管线对使用方的公开面(对应 PHP RendererInterface,
 // 另含单图层便捷渲染)。产物类型由后端决定
 type Renderer interface {
-	// Render 渲染整棵结构树:resolve → begin(画布尺寸) → 按 priority 序逐层 paint → end
+	// Render 渲染整棵结构树:begin(画布尺寸) → 按 priority 序逐层 paint
+	// (绘制分派前按需物化,spec §4.3) → end;失败即抛、渲染面丢弃、无产物逃逸
 	Render(ctx context.Context, c *canvas.Canvas) (any, error)
 
 	// RenderLayer 便捷:以图层自身尺寸为渲染面渲染单个图层
@@ -32,7 +33,10 @@ type paintable interface {
 	Height() int
 }
 
-// template 渲染模板:通用逻辑(物化 → 建面 → 遍历/分派 → 容器下钻 → 收尾)。
+// template 渲染模板:通用逻辑(建面 → 遍历/分派 → 容器下钻 → 收尾)。
+// 渲染器无预遍历,资源物化收敛到三个叶子 paint 分支开头按需发生
+// (spec §4.3 渲染期物化,PHP AbstractRenderer 同款;ResourceResolver 逻辑
+// 不变、只改调用时机——全画布预遍历 API 保留但渲染器不再调用)。
 // Backend 与物化器均为非导出字段——绘制原语只能经 Render/RenderLayer 模板流程
 // 触达,无法绕过遍历/定位/下钻逻辑直接调用
 type template struct {
@@ -49,33 +53,28 @@ func New(backend Backend, rs *resolver.ResourceResolver) Renderer {
 	return &template{backend: backend, resolver: rs}
 }
 
-// Render implements Renderer:模板首步即物化(渲染端只见本地路径)
+// Render implements Renderer:建面 → 逐层 paint(绘制分派前按需物化)→ 收尾。
+// 失败即抛、渲染面丢弃、无产物逃逸(begin 已调用但 end 不达)
 func (r *template) Render(ctx context.Context, c *canvas.Canvas) (any, error) {
-	if err := r.resolver.Resolve(ctx, c); err != nil {
-		return nil, err
-	}
-	return r.renderSurface(c.Width(), c.Height(), c.GetLayers())
+	return r.renderSurface(ctx, c.Width(), c.Height(), c.GetLayers())
 }
 
-// RenderLayer implements Renderer:先物化该图层,再以其自身尺寸建面
+// RenderLayer implements Renderer:以其自身尺寸建面,物化时机同 Render(惰性)
 func (r *template) RenderLayer(ctx context.Context, l layer.Layer) (any, error) {
-	if err := r.resolver.ResolveLayer(ctx, l); err != nil {
-		return nil, err
-	}
 	p, ok := l.(paintable)
 	if !ok {
 		return nil, fmt.Errorf("%w: %T", layer.ErrUnknownLayerType, l)
 	}
-	return r.renderSurface(p.Width(), p.Height(), []layer.Layer{l})
+	return r.renderSurface(ctx, p.Width(), p.Height(), []layer.Layer{l})
 }
 
-// renderSurface 建面 → 逐层 paint → 收尾;任一原语报错即中止
-func (r *template) renderSurface(width, height int, layers []layer.Layer) (any, error) {
+// renderSurface 建面 → 逐层 paint → 收尾;任一原语/物化报错即中止(渲染面丢弃)
+func (r *template) renderSurface(ctx context.Context, width, height int, layers []layer.Layer) (any, error) {
 	if err := r.backend.Begin(width, height); err != nil {
 		return nil, err
 	}
 	for _, l := range layers {
-		if err := r.paint(l, 0, 0, width, height); err != nil {
+		if err := r.paint(ctx, l, 0, 0, width, height); err != nil {
 			return nil, err
 		}
 	}
@@ -85,7 +84,7 @@ func (r *template) renderSurface(width, height int, layers []layer.Layer) (any, 
 // paint 在绝对坐标 (originX, originY) 处按图层自身定位设定绘制:
 // 九锚点相对父盒 parentWidth×parentHeight 解析,锚点偏移 + 定位偏移 = 绝对坐标;
 // instanceof 分派移植为类型 switch,未知类型报错
-func (r *template) paint(l layer.Layer, originX, originY, parentWidth, parentHeight int) error {
+func (r *template) paint(ctx context.Context, l layer.Layer, originX, originY, parentWidth, parentHeight int) error {
 	p, ok := l.(paintable)
 	if !ok {
 		return fmt.Errorf("%w: %T", layer.ErrUnknownLayerType, l)
@@ -99,17 +98,17 @@ func (r *template) paint(l layer.Layer, originX, originY, parentWidth, parentHei
 
 	switch t := p.(type) {
 	case *layer.TableLayer:
-		return r.paintTable(t, absX, absY)
+		return r.paintTable(ctx, t, absX, absY)
 	case *layer.TableRowLayer:
-		return r.paintRow(t, absX, absY)
+		return r.paintRow(ctx, t, absX, absY)
 	case *layer.TableCellLayer:
-		return r.paintCell(t, absX, absY)
+		return r.paintCell(ctx, t, absX, absY)
 	case *layer.ImageLayer:
-		return r.paintImage(t, absX, absY)
+		return r.paintImage(ctx, t, absX, absY)
 	case *layer.TextLayer:
-		return r.paintText(t, absX, absY)
+		return r.paintText(ctx, t, absX, absY)
 	case *layer.QrCodeLayer:
-		return r.paintQrCode(t, absX, absY)
+		return r.paintQrCode(ctx, t, absX, absY)
 	default:
 		return fmt.Errorf("%w: %T", layer.ErrUnknownLayerType, l)
 	}
@@ -117,14 +116,14 @@ func (r *template) paint(l layer.Layer, originX, originY, parentWidth, parentHei
 
 // paintTable 表容器:先画自身盒,再按行高累加纵向排布各行
 // (行锚点相对表盒解析;全部直画同一渲染面,坐标经参数传递)
-func (r *template) paintTable(l *layer.TableLayer, x, y int) error {
+func (r *template) paintTable(ctx context.Context, l *layer.TableLayer, x, y int) error {
 	if err := r.backend.DrawRect(x, y, l.Width(), l.Height(), l.Background(), l.Border()); err != nil {
 		return err
 	}
 
 	posy := y
 	for _, row := range l.Rows() {
-		if err := r.paint(row, x, posy, l.Width(), l.Height()); err != nil {
+		if err := r.paint(ctx, row, x, posy, l.Width(), l.Height()); err != nil {
 			return err
 		}
 		posy += row.Height()
@@ -133,14 +132,14 @@ func (r *template) paintTable(l *layer.TableLayer, x, y int) error {
 }
 
 // paintRow 行容器:先画自身盒,再按单元格宽累加横向排布各单元格
-func (r *template) paintRow(l *layer.TableRowLayer, x, y int) error {
+func (r *template) paintRow(ctx context.Context, l *layer.TableRowLayer, x, y int) error {
 	if err := r.backend.DrawRect(x, y, l.Width(), l.Height(), l.Background(), l.Border()); err != nil {
 		return err
 	}
 
 	posx := x
 	for _, cell := range l.Cells() {
-		if err := r.paint(cell, posx, y, l.Width(), l.Height()); err != nil {
+		if err := r.paint(ctx, cell, posx, y, l.Width(), l.Height()); err != nil {
 			return err
 		}
 		posx += cell.Width()
@@ -149,21 +148,25 @@ func (r *template) paintRow(l *layer.TableRowLayer, x, y int) error {
 }
 
 // paintCell 单元格:先画自身盒,再下钻内容层(内容层锚点相对单元格盒解析)
-func (r *template) paintCell(l *layer.TableCellLayer, x, y int) error {
+func (r *template) paintCell(ctx context.Context, l *layer.TableCellLayer, x, y int) error {
 	if err := r.backend.DrawRect(x, y, l.Width(), l.Height(), l.Background(), l.Border()); err != nil {
 		return err
 	}
 
 	if content := l.ContentLayer(); content != nil {
-		return r.paint(content, x, y, l.Width(), l.Height())
+		return r.paint(ctx, content, x, y, l.Width(), l.Height())
 	}
 	return nil
 }
 
-// paintImage 图片图层:先画自身盒,再按内容区对齐起点放置。
+// paintImage 图片图层:绘制分派前按需物化(spec §4.3,失败即抛渲染面丢弃),
+// 先画自身盒,再按内容区对齐起点放置。
 // src 取 ResolvedSrc(物化结果优先,回退原始引用——本地路径零物化直画),
 // 引用为 nil 时只画盒
-func (r *template) paintImage(l *layer.ImageLayer, x, y int) error {
+func (r *template) paintImage(ctx context.Context, l *layer.ImageLayer, x, y int) error {
+	if err := r.resolver.ResolveLayer(ctx, l); err != nil {
+		return err
+	}
 	if err := r.backend.DrawRect(x, y, l.Width(), l.Height(), l.Background(), l.Border()); err != nil {
 		return err
 	}
@@ -177,9 +180,13 @@ func (r *template) paintImage(l *layer.ImageLayer, x, y int) error {
 	return r.backend.DrawImage(*src, x+originX, y+originY, l.ContentWidth(), l.ContentHeight())
 }
 
-// paintText 文本图层:先画自身盒,再逐行绘制——起点 = padding + 文本对齐锚点,
-// 行距按行高像素累加;(x, y) 交由后端按对齐语义与字体 metrics 落笔
-func (r *template) paintText(l *layer.TextLayer, x, y int) error {
+// paintText 文本图层:绘制分派前按需物化(须先于 Lines()——真实字体度量
+// 依赖物化后的本地路径),先画自身盒,再逐行绘制——起点 = padding + 文本对齐
+// 锚点,行距按行高像素累加;(x, y) 交由后端按对齐语义与字体 metrics 落笔
+func (r *template) paintText(ctx context.Context, l *layer.TextLayer, x, y int) error {
+	if err := r.resolver.ResolveLayer(ctx, l); err != nil {
+		return err
+	}
 	if err := r.backend.DrawRect(x, y, l.Width(), l.Height(), l.Background(), l.Border()); err != nil {
 		return err
 	}
@@ -208,9 +215,13 @@ func (r *template) paintText(l *layer.TextLayer, x, y int) error {
 	return nil
 }
 
-// paintQrCode 二维码图层:先画自身盒,再按宽度正方形铺放
+// paintQrCode 二维码图层:绘制分派前按需物化(spec §4.3,失败即抛渲染面丢弃),
+// 先画自身盒,再按宽度正方形铺放
 // (与 PHP 模板一致,忽略声明高度;src 未物化为 nil 时只画盒)
-func (r *template) paintQrCode(l *layer.QrCodeLayer, x, y int) error {
+func (r *template) paintQrCode(ctx context.Context, l *layer.QrCodeLayer, x, y int) error {
+	if err := r.resolver.ResolveLayer(ctx, l); err != nil {
+		return err
+	}
 	if err := r.backend.DrawRect(x, y, l.Width(), l.Height(), l.Background(), l.Border()); err != nil {
 		return err
 	}

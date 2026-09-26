@@ -177,7 +177,8 @@ func TestRenderLayerUsesLayerOwnSizeAsSurface(t *testing.T) {
 // ---- 模板首步即物化 ----
 
 func TestResolverRunsBeforeBegin(t *testing.T) {
-	// 二维码图层需要物化而缝未接线:Render 在建面前即失败,原语零调用
+	// 二维码图层需要物化而缝未接线:spec §4.3 失败时机后移——渲染面先建立,
+	// 绘制分派时物化失败即抛、渲染面丢弃(begin 已调用,end 不达)
 	qr := layer.NewQrCodeLayer(layer.WithSize(30, 30), layer.WithQrText("payload"))
 	backend := &fakeBackend{}
 	r := renderer.New(backend, resolver.New(resolver.WithCacheRoot(t.TempDir())))
@@ -186,8 +187,8 @@ func TestResolverRunsBeforeBegin(t *testing.T) {
 	if !errors.Is(err, resolver.ErrQRMaterializerRequired) {
 		t.Fatalf("err = %v, want ErrQRMaterializerRequired", err)
 	}
-	if len(backend.ops) != 0 {
-		t.Errorf("物化失败后不应触达任何原语: got %v", backend.ops)
+	if fmt.Sprint(backend.ops) != fmt.Sprint([]string{"begin"}) {
+		t.Errorf("失败时机应为建面后、绘制分派中: got %v, want [begin]", backend.ops)
 	}
 }
 
