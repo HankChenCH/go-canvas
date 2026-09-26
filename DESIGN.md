@@ -6,14 +6,14 @@
 
 - 根需求是**双端互通**：同一份 graph JSON 两端都能渲染，布局级一致（断行行数、行内容、图层坐标），像素不求等。
 - v1 **严格对等** PHP 已有能力：圆角、透明度、混合模式、阴影一律不做，另立项。
-- 表达式引擎不存在；wire 面保留 `data.expression` 空串占位，与 PHP 字节面兼容。
+- 表达式引擎 v2 已落地（工票 12，spec `../.scratch/table-layer-v2/spec.md`）：`expand/` 包承载求值器注入缝 + 默认受限插值实现与模板表展开步骤；wire 面三内容层 `SetExpression` 载体 + TableLayer 模板态条件写键，与 PHP 字节面兼容。三端语义一致性由共享 fixture 锁定（`expand/testdata/`，PHP 导出）。
 
 ## 仓库与模块
 
 - 位置：本目录（工作区子目录，独立 git 仓库）；暂无远端、暂不配 CI，推远端时再加 GitHub Actions。
 - module path：`github.com/hankchen/go-canvas`；Go 基线 1.25。
 - **2 modules**：
-  - 根 module = 核心包（`canvas`/`layer`/`renderer`/`resolver`/`text`），**纯 stdlib 零第三方依赖**（ADR-0002）；依赖方向 canvas ← {renderer, resolver}、text ← layer ← canvas，由 import 图在编译期硬保证。
+  - 根 module = 核心包（`canvas`/`layer`/`renderer`/`resolver`/`text`/`expand`），**纯 stdlib 零第三方依赖**（ADR-0002）；依赖方向 canvas ← {renderer, resolver, expand}、text ← layer ← canvas（expand 属结构侧，只读 canvas/layer），由 import 图在编译期硬保证。
   - `image-renderer/`（M2 新建嵌套 module）：x/image、go-text/typesetting、go-qrcode、按需 bild。
 - **纯 Go 硬红线**：不接受 CGO（ADR-0001）。
 
