@@ -8,16 +8,22 @@ import "encoding/json"
 // ValueTypeStatic data.valueType 的静态取值标识
 const ValueTypeStatic = "StaticValue"
 
+// ValueTypeExpression data.valueType 的数据表达式标记取值(TableLayer V2,spec §3.1):
+// 只有标记字段进求值;未标记字段一律字面直通(数据集在场也不误伤存量文案里的字面 {{)
+const ValueTypeExpression = "ExpressionValue"
+
 // Node 图层在 graph 中的 wire 节点。类型专属键仅由对应图层类型写出:
-// data 属图片/文本/二维码图层,rows/cells/content 属对应表格容器——
-// 非 nil 才写出(空容器也恒写键,见各容器 Graph)。rows/cells 用指针切片表达
-// "键存在且为空数组";content 的"键存在且为 null"是 *Node 配合 omitempty 表达
-// 不了的(nil 即缺键),故以 RawMessage 承载,顺带按字节原样保留嵌套载荷。
+// data 属图片/文本/二维码/模板态表格图层,rows/cells/content 属对应表格容器,
+// template 属模板态表格——非 nil 才写出(空容器也恒写键,见各容器 Graph)。
+// rows/cells 用指针切片表达"键存在且为空数组";content/template 的"键存在且为 null"
+// 是 *Node 配合 omitempty 表达不了的(nil 即缺键),故以 RawMessage 承载,
+// 顺带按字节原样保留嵌套载荷。
 type Node struct {
 	Type     string          `json:"type"`
 	Priority int             `json:"priority"`
 	Spec     Spec            `json:"spec"`
 	Data     *Data           `json:"data,omitempty"`
+	Template json.RawMessage `json:"template,omitempty"`
 	Rows     *[]Node         `json:"rows,omitempty"`
 	Cells    *[]Node         `json:"cells,omitempty"`
 	Content  json.RawMessage `json:"content,omitempty"`
@@ -89,11 +95,27 @@ type Position struct {
 	Position string `json:"position"`
 }
 
-// Data 图层业务数据。图片/二维码图层仅 valueType/value 两键——无 expression 预留键,
-// 与 PHP 字节面一致;文本图层恒写 expression 空串占位(表达式引擎不存在,
-// 仅保留 wire 字段,PHP 同款)
+// Data 图层数据,两种形态按生产者分流(PHP data 键两形态同款):
+// 内容层(Text/Image/Qr)= valueType 恒写 + expression 条件写键(Text 恒写占位、
+// Image/Qr 仅标记态写) + value 恒写(可为 null);模板态表格 = 仅 rowsPath 键
+// (PHP TableLayer::graph() 同款,无 valueType/value)。
+// 序列化按 RowsPath 非空分派表格形态,保双端字节面
 type Data struct {
 	ValueType  string  `json:"valueType"`
 	Expression *string `json:"expression,omitempty"`
 	Value      *string `json:"value"`
+	// RowsPath 取行路径(点路径字符串,spec §3.3):仅模板态 TableLayer 写出
+	RowsPath string `json:"rowsPath,omitempty"`
+}
+
+// MarshalJSON 分形态序列化(见 Data 注释):RowsPath 非空 = 表格形态仅 rowsPath 一键;
+// 否则内容层形态(valueType/expression/value 按 tag 规则)
+func (d Data) MarshalJSON() ([]byte, error) {
+	if d.RowsPath != "" {
+		return json.Marshal(struct {
+			RowsPath string `json:"rowsPath"`
+		}{RowsPath: d.RowsPath})
+	}
+	type dataAlias Data
+	return json.Marshal(dataAlias(d))
 }

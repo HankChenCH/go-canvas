@@ -17,6 +17,9 @@ func (f baseOpt) applyQrCode(l *QrCodeLayer)       { f(&l.base) }
 func (f baseOpt) applyTable(l *TableLayer)         { f(&l.base) }
 func (f baseOpt) applyTableRow(l *TableRowLayer)   { f(&l.base) }
 func (f baseOpt) applyTableCell(l *TableCellLayer) { f(&l.base) }
+func (f baseOpt) applyTableRowTemplate(l *TableRowTemplate) {
+	f(&l.base)
+}
 
 // imageOpt 图片图层专属选项
 type imageOpt func(*ImageLayer)
@@ -65,6 +68,9 @@ func (f tableCellOpt) applyTableCell(l *TableCellLayer) { f(l) }
 
 // tableCellLayerOpt 表格单元格图层构造选项(公共 + 单元格专属)
 type tableCellLayerOpt interface{ applyTableCell(*TableCellLayer) }
+
+// tableRowTemplateLayerOpt 表格行模板构造选项(公共 + 模板行专属;模板行暂无专属选项)
+type tableRowTemplateLayerOpt interface{ applyTableRowTemplate(*TableRowTemplate) }
 
 // WithSize 声明尺寸;会清除 auto 标志
 func WithSize(width, height int) baseOpt {
@@ -172,9 +178,9 @@ func borderColor(color []string) string {
 	return DefaultBorderColor
 }
 
-// WithText 文本内容(PHP setText 的选项形态)
+// WithText 文本内容(PHP setText 的选项形态):字面 setter,解除表达式标记
 func WithText(text string) textOpt {
-	return func(l *TextLayer) { l.text = text }
+	return func(l *TextLayer) { l.SetText(text) }
 }
 
 // WithFont 字体设定:字体文件路径/URL + 字号 + 颜色(PHP setFont 的选项形态);
@@ -209,11 +215,14 @@ func WithQrText(text string) qrCodeOpt {
 	return func(l *QrCodeLayer) { l.SetText(text) }
 }
 
-// WithRows 批量收纳行:内部走同一条 AddRow 路径(行宽同步、内容盒高累加)
+// WithRows 批量收纳行:内部走同一条 AddRow 路径(行宽同步、内容盒高累加)。
+// 选项无错误通道;模板态误用属编程错误,与 marshalNode 同款 fail-fast
 func WithRows(rows ...*TableRowLayer) tableOpt {
 	return func(l *TableLayer) {
 		for _, r := range rows {
-			l.AddRow(r)
+			if err := l.AddRow(r); err != nil {
+				panic(err)
+			}
 		}
 	}
 }

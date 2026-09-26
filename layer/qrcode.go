@@ -6,7 +6,10 @@ package layer
 // QrCodeLayer 二维码图层
 type QrCodeLayer struct {
 	base
-	qrText      string
+	qrText string
+	// expression 数据表达式标记(TableLayer V2,spec §3.1):非 nil = 已标记,
+	// value 载体(qrText)恒镜像表达式原文;字面 setter 解除标记
+	expression  *string
 	resolvedSrc *string
 }
 
@@ -19,9 +22,18 @@ func NewQrCodeLayer(opts ...qrCodeLayerOpt) *QrCodeLayer {
 	return l
 }
 
-// SetText 设置二维码内容,并清空已物化结果
+// SetText 设置二维码内容,并解除表达式标记、清空已物化结果
 func (l *QrCodeLayer) SetText(content string) {
 	l.qrText = content
+	l.expression = nil
+	l.resolvedSrc = nil
+}
+
+// SetExpression 标记数据表达式(spec §3.1):value 载体恒镜像表达式原文
+// (旧端降级可见、审计可读的求值源记录;求值结果永不落图层)
+func (l *QrCodeLayer) SetExpression(expression string) {
+	l.expression = &expression
+	l.qrText = expression
 	l.resolvedSrc = nil
 }
 
@@ -55,12 +67,17 @@ func (l *QrCodeLayer) ContentHeight() int {
 // TypeName implements Layer
 func (l *QrCodeLayer) TypeName() string { return TypeQrCode }
 
-// Graph 序列化为 wire 节点;data 仅 valueType/value 两键(无 expression 预留键),
+// Graph 序列化为 wire 节点;data 条件写键:标记态三键(ExpressionValue),
+// 未标记两键(StaticValue,无 expression 键)——保 Go↔PHP 字节 parity;
 // value 始终携带内容,与是否已物化无关(无损)
 func (l *QrCodeLayer) Graph() Node {
 	n := l.base.wireNode(TypeQrCode)
 	value := l.qrText
-	n.Data = &Data{ValueType: ValueTypeStatic, Value: &value}
+	if l.expression != nil {
+		n.Data = &Data{ValueType: ValueTypeExpression, Expression: l.expression, Value: &value}
+	} else {
+		n.Data = &Data{ValueType: ValueTypeStatic, Value: &value}
+	}
 	return n
 }
 
@@ -69,7 +86,11 @@ func QrCodeFromGraph(n Node) *QrCodeLayer {
 	l := NewQrCodeLayer()
 	l.applyNode(n)
 	if n.Data != nil {
-		l.SetText(derefOrEmpty(n.Data.Value))
+		if n.Data.ValueType == ValueTypeExpression && n.Data.Expression != nil {
+			l.SetExpression(*n.Data.Expression)
+		} else {
+			l.SetText(derefOrEmpty(n.Data.Value))
+		}
 	}
 	return l
 }

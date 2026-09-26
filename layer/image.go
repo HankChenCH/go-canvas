@@ -6,7 +6,10 @@ package layer
 // ImageLayer 图片图层
 type ImageLayer struct {
 	base
-	rawImg      *string
+	rawImg *string
+	// expression 数据表达式标记(TableLayer V2,spec §3.1):非 nil = 已标记,
+	// value 载体(rawImg)恒镜像表达式原文;字面 setter 解除标记
+	expression  *string
 	resolvedSrc *string
 }
 
@@ -33,6 +36,15 @@ func (l *ImageLayer) SetImage(src string) {
 	} else {
 		l.rawImg = &src
 	}
+	l.expression = nil
+	l.resolvedSrc = nil
+}
+
+// SetExpression 标记数据表达式(spec §3.1):value 载体恒镜像表达式原文
+// (旧端降级可见、审计可读的求值源记录;求值结果永不落图层)
+func (l *ImageLayer) SetExpression(expression string) {
+	l.expression = &expression
+	l.rawImg = &expression
 	l.resolvedSrc = nil
 }
 
@@ -82,10 +94,15 @@ func (l *ImageLayer) ImageOrigin() (int, int) {
 // TypeName implements Layer
 func (l *ImageLayer) TypeName() string { return TypeImage }
 
-// Graph 序列化为 wire 节点;data 仅 valueType/value 两键(无 expression 预留键)
+// Graph 序列化为 wire 节点;data 条件写键:标记态三键(ExpressionValue),
+// 未标记两键(StaticValue,无 expression 键)——保 Go↔PHP 字节 parity
 func (l *ImageLayer) Graph() Node {
 	n := l.base.wireNode(TypeImage)
-	n.Data = &Data{ValueType: ValueTypeStatic, Value: l.rawImg}
+	if l.expression != nil {
+		n.Data = &Data{ValueType: ValueTypeExpression, Expression: l.expression, Value: l.rawImg}
+	} else {
+		n.Data = &Data{ValueType: ValueTypeStatic, Value: l.rawImg}
+	}
 	return n
 }
 
@@ -94,7 +111,11 @@ func ImageFromGraph(n Node) *ImageLayer {
 	l := NewImageLayer()
 	l.applyNode(n)
 	if n.Data != nil {
-		l.SetImage(derefOrEmpty(n.Data.Value))
+		if n.Data.ValueType == ValueTypeExpression && n.Data.Expression != nil {
+			l.SetExpression(*n.Data.Expression)
+		} else {
+			l.SetImage(derefOrEmpty(n.Data.Value))
+		}
 	}
 	return l
 }

@@ -170,7 +170,8 @@ func TestFromGraphRejectsUnknownType(t *testing.T) {
 	if !strings.Contains(err.Error(), "VideoLayer") {
 		t.Errorf("错误消息不含类型名: %v", err)
 	}
-	if want := "未知图层类型: VideoLayer"; err.Error() != want {
+	// 工票 12(Q5 决议):错误文案 code 前缀化,sentinel 值 = 稳定 code
+	if want := "unknown_layer_type: VideoLayer"; err.Error() != want {
 		t.Errorf("错误消息 = %q, want %q", err.Error(), want)
 	}
 }

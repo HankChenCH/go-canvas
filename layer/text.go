@@ -10,12 +10,15 @@ import (
 // 默认策略对齐 PHP:启发式度量 + 照搬版贪心断行器(ADR-0003)
 type TextLayer struct {
 	base
-	text      string
-	font      string
-	fontSize  int
-	fontColor string
-	textAngle int
-	autowrap  bool
+	text string
+	// expression 数据表达式标记(TableLayer V2,spec §3.1):非 nil = 已标记,
+	// value 载体(text)恒镜像表达式原文;字面 setter 解除标记
+	expression *string
+	font       string
+	fontSize   int
+	fontColor  string
+	textAngle  int
+	autowrap   bool
 
 	lineBreaker     text.LineBreaker
 	measurerFactory text.MeasurerFactory
@@ -46,6 +49,19 @@ func (l *TextLayer) setFont(font string, fontSize int, fontColor string) {
 	l.fontSize = fontSize
 	l.fontColor = fontColor
 	l.resolvedFont = nil
+}
+
+// SetText 设置字面文本,并解除表达式标记(标记与字面互斥,PHP setText 同款)
+func (l *TextLayer) SetText(text string) {
+	l.text = text
+	l.expression = nil
+}
+
+// SetExpression 标记数据表达式(spec §3.1):value 载体恒镜像表达式原文
+// (旧端降级可见、审计可读的求值源记录;求值结果永不落图层)
+func (l *TextLayer) SetExpression(expression string) {
+	l.expression = &expression
+	l.text = expression
 }
 
 // Text 文本内容
@@ -180,8 +196,12 @@ func (l *TextLayer) Graph() Node {
 		Autowrap:  l.autowrap,
 	}
 	value := l.text
-	expression := ""
-	n.Data = &Data{ValueType: ValueTypeStatic, Expression: &expression, Value: &value}
+	if l.expression != nil {
+		n.Data = &Data{ValueType: ValueTypeExpression, Expression: l.expression, Value: &value}
+	} else {
+		expression := ""
+		n.Data = &Data{ValueType: ValueTypeStatic, Expression: &expression, Value: &value}
+	}
 	return n
 }
 
@@ -196,7 +216,11 @@ func TextFromGraph(n Node) *TextLayer {
 		l.autowrap = ff.Autowrap
 	}
 	if n.Data != nil {
-		l.text = derefOrEmpty(n.Data.Value)
+		if n.Data.ValueType == ValueTypeExpression && n.Data.Expression != nil {
+			l.SetExpression(*n.Data.Expression)
+		} else {
+			l.text = derefOrEmpty(n.Data.Value)
+		}
 	}
 	return l
 }

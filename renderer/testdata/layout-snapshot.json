@@ -2228,6 +2228,449 @@
                     "expectedYDiff": 0
                 }
             ]
+        },
+        {
+            "name": "table-template-wire",
+            "description": "TableLayer V2 模板态 wire 三端 parity（go-canvas 工票 12）：template 键 + data.rowsPath + TableRowTemplate 类型 + 表达式标记（Text 恒写 expression 三键 / Image 条件两键）；模板态渲染 = 空壳（表壳按声明画，行区零高），V1 具体行表同画布对照",
+            "graph": {
+                "canvas": {
+                    "width": 320,
+                    "height": 320
+                },
+                "layers": [
+                    {
+                        "type": "TableLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 320,
+                                "height": 200,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": "#ffffff"
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "top"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            }
+                        },
+                        "data": {
+                            "rowsPath": "order.items"
+                        },
+                        "template": {
+                            "type": "TableRowTemplate",
+                            "priority": 0,
+                            "spec": {
+                                "shape": {
+                                    "width": 320,
+                                    "height": 0,
+                                    "autoWidth": false,
+                                    "autoHeight": true,
+                                    "lineHeight": 1,
+                                    "padding": {
+                                        "top": 0,
+                                        "bottom": 0,
+                                        "left": 0,
+                                        "right": 0
+                                    },
+                                    "border": {
+                                        "top": null,
+                                        "bottom": null,
+                                        "left": null,
+                                        "right": null
+                                    },
+                                    "backgroundColor": null
+                                },
+                                "align": {
+                                    "horizontal": "left",
+                                    "vertical": "top"
+                                },
+                                "position": {
+                                    "x": 0,
+                                    "y": 0,
+                                    "position": "top-left"
+                                }
+                            },
+                            "cells": [
+                                {
+                                    "type": "TableCellLayer",
+                                    "priority": 0,
+                                    "spec": {
+                                        "shape": {
+                                            "width": 160,
+                                            "height": 0,
+                                            "autoWidth": false,
+                                            "autoHeight": true,
+                                            "lineHeight": 1,
+                                            "padding": {
+                                                "top": 0,
+                                                "bottom": 0,
+                                                "left": 0,
+                                                "right": 0
+                                            },
+                                            "border": {
+                                                "top": null,
+                                                "bottom": null,
+                                                "left": null,
+                                                "right": null
+                                            },
+                                            "backgroundColor": null
+                                        },
+                                        "align": {
+                                            "horizontal": "left",
+                                            "vertical": "top"
+                                        },
+                                        "position": {
+                                            "x": 0,
+                                            "y": 0,
+                                            "position": "top-left"
+                                        }
+                                    },
+                                    "content": {
+                                        "type": "TextLayer",
+                                        "priority": 0,
+                                        "spec": {
+                                            "shape": {
+                                                "width": 160,
+                                                "height": 0,
+                                                "autoWidth": false,
+                                                "autoHeight": true,
+                                                "lineHeight": 1,
+                                                "padding": {
+                                                    "top": 0,
+                                                    "bottom": 0,
+                                                    "left": 0,
+                                                    "right": 0
+                                                },
+                                                "border": {
+                                                    "top": null,
+                                                    "bottom": null,
+                                                    "left": null,
+                                                    "right": null
+                                                },
+                                                "backgroundColor": null
+                                            },
+                                            "align": {
+                                                "horizontal": "left",
+                                                "vertical": "bottom"
+                                            },
+                                            "position": {
+                                                "x": 0,
+                                                "y": 0,
+                                                "position": "top-left"
+                                            },
+                                            "fontFamily": {
+                                                "font": "",
+                                                "fontSize": 12,
+                                                "fontColor": "#000000",
+                                                "angle": 0,
+                                                "autowrap": false
+                                            }
+                                        },
+                                        "data": {
+                                            "valueType": "ExpressionValue",
+                                            "expression": "姓名：{{row.name}}",
+                                            "value": "姓名：{{row.name}}"
+                                        }
+                                    }
+                                },
+                                {
+                                    "type": "TableCellLayer",
+                                    "priority": 0,
+                                    "spec": {
+                                        "shape": {
+                                            "width": 160,
+                                            "height": 40,
+                                            "autoWidth": false,
+                                            "autoHeight": false,
+                                            "lineHeight": 1,
+                                            "padding": {
+                                                "top": 0,
+                                                "bottom": 0,
+                                                "left": 0,
+                                                "right": 0
+                                            },
+                                            "border": {
+                                                "top": null,
+                                                "bottom": null,
+                                                "left": null,
+                                                "right": null
+                                            },
+                                            "backgroundColor": null
+                                        },
+                                        "align": {
+                                            "horizontal": "left",
+                                            "vertical": "top"
+                                        },
+                                        "position": {
+                                            "x": 0,
+                                            "y": 0,
+                                            "position": "top-left"
+                                        }
+                                    },
+                                    "content": {
+                                        "type": "ImageLayer",
+                                        "priority": 0,
+                                        "spec": {
+                                            "shape": {
+                                                "width": 160,
+                                                "height": 40,
+                                                "autoWidth": false,
+                                                "autoHeight": false,
+                                                "lineHeight": 1,
+                                                "padding": {
+                                                    "top": 0,
+                                                    "bottom": 0,
+                                                    "left": 0,
+                                                    "right": 0
+                                                },
+                                                "border": {
+                                                    "top": null,
+                                                    "bottom": null,
+                                                    "left": null,
+                                                    "right": null
+                                                },
+                                                "backgroundColor": null
+                                            },
+                                            "align": {
+                                                "horizontal": "center",
+                                                "vertical": "center"
+                                            },
+                                            "position": {
+                                                "x": 0,
+                                                "y": 0,
+                                                "position": "top-left"
+                                            }
+                                        },
+                                        "data": {
+                                            "valueType": "StaticValue",
+                                            "value": null
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "type": "TableLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 320,
+                                "height": 100,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": "#f0f0f0"
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "top"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 220,
+                                "position": "top-left"
+                            }
+                        },
+                        "rows": [
+                            {
+                                "type": "TableRowLayer",
+                                "priority": 0,
+                                "spec": {
+                                    "shape": {
+                                        "width": 320,
+                                        "height": 30,
+                                        "autoWidth": false,
+                                        "autoHeight": false,
+                                        "lineHeight": 1,
+                                        "padding": {
+                                            "top": 0,
+                                            "bottom": 0,
+                                            "left": 0,
+                                            "right": 0
+                                        },
+                                        "border": {
+                                            "top": null,
+                                            "bottom": null,
+                                            "left": null,
+                                            "right": null
+                                        },
+                                        "backgroundColor": null
+                                    },
+                                    "align": {
+                                        "horizontal": "left",
+                                        "vertical": "top"
+                                    },
+                                    "position": {
+                                        "x": 0,
+                                        "y": 0,
+                                        "position": "top-left"
+                                    }
+                                },
+                                "cells": [
+                                    {
+                                        "type": "TableCellLayer",
+                                        "priority": 0,
+                                        "spec": {
+                                            "shape": {
+                                                "width": 320,
+                                                "height": 30,
+                                                "autoWidth": false,
+                                                "autoHeight": false,
+                                                "lineHeight": 1,
+                                                "padding": {
+                                                    "top": 0,
+                                                    "bottom": 0,
+                                                    "left": 0,
+                                                    "right": 0
+                                                },
+                                                "border": {
+                                                    "top": null,
+                                                    "bottom": null,
+                                                    "left": null,
+                                                    "right": null
+                                                },
+                                                "backgroundColor": null
+                                            },
+                                            "align": {
+                                                "horizontal": "left",
+                                                "vertical": "top"
+                                            },
+                                            "position": {
+                                                "x": 0,
+                                                "y": 0,
+                                                "position": "top-left"
+                                            }
+                                        },
+                                        "content": {
+                                            "type": "TextLayer",
+                                            "priority": 0,
+                                            "spec": {
+                                                "shape": {
+                                                    "width": 320,
+                                                    "height": 30,
+                                                    "autoWidth": false,
+                                                    "autoHeight": false,
+                                                    "lineHeight": 1,
+                                                    "padding": {
+                                                        "top": 0,
+                                                        "bottom": 0,
+                                                        "left": 0,
+                                                        "right": 0
+                                                    },
+                                                    "border": {
+                                                        "top": null,
+                                                        "bottom": null,
+                                                        "left": null,
+                                                        "right": null
+                                                    },
+                                                    "backgroundColor": null
+                                                },
+                                                "align": {
+                                                    "horizontal": "left",
+                                                    "vertical": "bottom"
+                                                },
+                                                "position": {
+                                                    "x": 0,
+                                                    "y": 0,
+                                                    "position": "top-left"
+                                                },
+                                                "fontFamily": {
+                                                    "font": "",
+                                                    "fontSize": 12,
+                                                    "fontColor": "#000000",
+                                                    "angle": 0,
+                                                    "autowrap": false
+                                                }
+                                            },
+                                            "data": {
+                                                "valueType": "StaticValue",
+                                                "expression": "",
+                                                "value": "V1 具体行"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            "records": [
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 0,
+                    "w": 320,
+                    "h": 200
+                },
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 220,
+                    "w": 320,
+                    "h": 100
+                },
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 220,
+                    "w": 320,
+                    "h": 30
+                },
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 220,
+                    "w": 320,
+                    "h": 30
+                },
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 220,
+                    "w": 320,
+                    "h": 30
+                },
+                {
+                    "op": "text",
+                    "line": "V1 具体行",
+                    "x": 0,
+                    "y": 250,
+                    "expectedYDiff": 0
+                }
+            ]
         }
     ]
 }
