@@ -15,7 +15,7 @@ else
 endif
 endif
 
-.PHONY: test vet layout-snapshot visual-check
+.PHONY: test vet layout-snapshot expand-fixtures visual-check
 
 test:
 	go test ./...
@@ -28,6 +28,13 @@ vet:
 layout-snapshot:
 	$(PHP) ../php-canvas-next/scripts/export-layout-snapshot.php renderer/testdata/layout-snapshot.json
 	@echo "快照已更新:人审 git diff(diff 即双端布局行为 diff)后随代码一并提交"
+
+# V2 共享 fixture 再生成(工票 12):expression-eval + expand-semantics 两份 JSON
+# 提交进本仓库,Go 侧 runner 为 expand/fixture_test.go;PHP 侧为语义权威,
+# 何时需要重导见 fixture meta.notes
+expand-fixtures:
+	$(PHP) ../php-canvas-next/scripts/export-expand-fixtures.php expand/testdata
+	@echo "fixture 已更新:人审 git diff(diff 即双端语义行为 diff)后随代码一并提交"
 
 # 目验脚本:渲染综合样图供人工目验(工单 11,用法与目验要点见 docs/visual-check.md);
 # 缺省产物 image-renderer/visual-check.png(已 gitignore),可传 OUTPUT= 覆写
