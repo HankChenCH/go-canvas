@@ -2671,6 +2671,169 @@
                     "expectedYDiff": 0
                 }
             ]
+        },
+        {
+            "name": "name-visible-contract",
+            "description": "图层 name/visible 契约（layer-panel-ux 工单 01）：name 仅非空写键、visible 仅 false 写键，缺省图层字节面与无字段版本一致；hidden 根层渲染跳过（不产生绘制记录），named+hidden 与 named+visible 与无名默认三层对照",
+            "graph": {
+                "canvas": {
+                    "width": 160,
+                    "height": 80
+                },
+                "layers": [
+                    {
+                        "type": "TextLayer",
+                        "name": "标题层",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 80,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "bottom"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            },
+                            "fontFamily": {
+                                "font": "",
+                                "fontSize": 12,
+                                "fontColor": "#000000",
+                                "angle": 0,
+                                "autowrap": false
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "expression": "",
+                            "value": "named visible"
+                        }
+                    },
+                    {
+                        "type": "ImageLayer",
+                        "name": "隐藏图",
+                        "visible": false,
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 40,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": "#ff0000"
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 40,
+                                "position": "top-left"
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "value": null
+                        }
+                    },
+                    {
+                        "type": "QrCodeLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 40,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "top"
+                            },
+                            "position": {
+                                "x": 100,
+                                "y": 0,
+                                "position": "top-left"
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "value": ""
+                        }
+                    }
+                ]
+            },
+            "records": [
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 0,
+                    "w": 80,
+                    "h": 24
+                },
+                {
+                    "op": "text",
+                    "line": "named visible",
+                    "x": 0,
+                    "y": 24,
+                    "expectedYDiff": 0
+                },
+                {
+                    "op": "rect",
+                    "x": 100,
+                    "y": 0,
+                    "w": 40,
+                    "h": 24
+                }
+            ]
         }
     ]
 }

@@ -46,6 +46,9 @@ type Layer interface {
 	TypeName() string
 	// Priority 绘制次序:越大越先渲染(视觉上越垫底)
 	Priority() int
+	// Visible 显隐设定(layer-panel-ux 工单 01):false 的根图层被渲染循环跳过
+	// (隐藏 = 最终输出排除)
+	Visible() bool
 	// Graph 序列化为 wire 节点(无损)
 	Graph() Node
 }

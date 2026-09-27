@@ -42,15 +42,22 @@ type base struct {
 	position        string
 	x, y            int
 	priority        int
+	// displayName 用户命名(wire 键 name,layer-panel-ux 工单 01):与类型标识无关,
+	// 缺省空串且序列化键省略(仅非空写键)
+	// visible 显隐设定(wire 键 visible):缺省 true 且序列化键省略(仅 false 写键),
+	// 渲染循环跳过 false 的根图层
+	displayName string
+	visible     bool
 }
 
-// newBase 默认态:0 尺寸、无背景、left/top、top-left、priority 0、行高 1
+// newBase 默认态:0 尺寸、无背景、left/top、top-left、priority 0、行高 1、可见、未命名
 func newBase() base {
 	return base{
 		lineHeight:      1,
 		horizontalAlign: AlignLeft,
 		verticalAlign:   AlignTop,
 		position:        AnchorTopLeft,
+		visible:         true,
 	}
 }
 
@@ -142,6 +149,18 @@ func (b *base) HorizontalAlign() string { return b.horizontalAlign }
 func (b *base) VerticalAlign() string   { return b.verticalAlign }
 func (b *base) Priority() int           { return b.priority }
 
+// SetDisplayName 用户命名(wire 键 name,layer-panel-ux 工单 01);空串 = 未命名,序列化键省略
+func (b *base) SetDisplayName(name string) { b.displayName = name }
+
+// DisplayName 用户命名;缺省空串
+func (b *base) DisplayName() string { return b.displayName }
+
+// SetVisible 显隐设定(wire 键 visible);false 的根图层被渲染循环跳过(最终输出排除)
+func (b *base) SetVisible(visible bool) { b.visible = visible }
+
+// Visible 显隐设定;缺省 true
+func (b *base) Visible() bool { return b.visible }
+
 // Position 返回 (锚点, x, y)
 func (b *base) Position() (string, int, int) {
 	return b.position, b.x, b.y
@@ -149,9 +168,11 @@ func (b *base) Position() (string, int, int) {
 
 // ---- graph 构造与回放 ----
 
-// wireNode 以 typ 为类型标识生成 wire 节点的公共部分(对应 PHP AbstractLayer::graph)
+// wireNode 以 typ 为类型标识生成 wire 节点的公共部分(对应 PHP AbstractLayer::graph)。
+// 键省略契约(name/visible,layer-panel-ux 工单 01):name 仅非空写、visible 仅 false 写
+// ——缺省态字节面与无字段版本一致
 func (b *base) wireNode(typ string) Node {
-	return Node{
+	node := Node{
 		Type:     typ,
 		Priority: b.priority,
 		Spec: Spec{
@@ -169,10 +190,19 @@ func (b *base) wireNode(typ string) Node {
 			Position: Position{X: b.x, Y: b.y, Position: b.position},
 		},
 	}
+	if b.displayName != "" {
+		node.Name = b.displayName
+	}
+	if !b.visible {
+		hidden := false
+		node.Visible = &hidden
+	}
+	return node
 }
 
 // applyNode 把 wire 节点回放到 base(对齐 PHP applyGraph)。
-// wire 是无缺键的定长结构,空串仅视作"锚点/对齐缺省",保留图层构造默认。
+// 除 name/visible 条件键外 wire 是无缺键的定长结构,空串仅视作"锚点/对齐缺省",
+// 保留图层构造默认;name/visible 在场才生效,缺省值形态(空串、true)由序列化侧归一省略。
 func (b *base) applyNode(n Node) {
 	shape := n.Spec.Shape
 	if shape.AutoWidth {
@@ -204,4 +234,10 @@ func (b *base) applyNode(n Node) {
 		b.setPosition(p.X, p.Y, anchor)
 	}
 	b.priority = n.Priority
+	if n.Name != "" {
+		b.displayName = n.Name
+	}
+	if n.Visible != nil {
+		b.visible = *n.Visible
+	}
 }

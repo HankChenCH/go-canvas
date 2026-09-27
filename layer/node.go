@@ -19,7 +19,12 @@ const ValueTypeExpression = "ExpressionValue"
 // 是 *Node 配合 omitempty 表达不了的(nil 即缺键),故以 RawMessage 承载,
 // 顺带按字节原样保留嵌套载荷。
 type Node struct {
-	Type     string          `json:"type"`
+	Type string `json:"type"`
+	// Name 用户命名(layer-panel-ux 工单 01):仅非空写键,缺省态键省略(往返恒等)
+	Name string `json:"name,omitempty"`
+	// Visible 显隐设定:仅 false 写键——*bool nil 即缺键(true 形态由解码侧归一),
+	// 渲染循环跳过 false 的根图层
+	Visible  *bool           `json:"visible,omitempty"`
 	Priority int             `json:"priority"`
 	Spec     Spec            `json:"spec"`
 	Data     *Data           `json:"data,omitempty"`

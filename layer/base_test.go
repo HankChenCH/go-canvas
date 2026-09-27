@@ -10,6 +10,7 @@ package layer_test
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/hankchen/go-canvas/layer"
@@ -181,5 +182,61 @@ func TestGraphRoundtripBase(t *testing.T) {
 	}
 	if got, want := jsonOf(t, rebuilt.Graph()), jsonOf(t, l.Graph()); got != want {
 		t.Errorf("往返 graph 不恒等:\n got  %s\n want %s", got, want)
+	}
+}
+
+// name/visible 契约(layer-panel-ux 工单 01):缺省态键省略、带值条件写键、往返恒等。
+// PHP 对位 AbstractLayerTest::testNameVisible*(字节面/键序三端一致)
+func TestNameVisibleWireKeys(t *testing.T) {
+	// 缺省态:不写 name/visible 键(字节面与无字段版本一致)
+	def := jsonOf(t, layer.NewImageLayer().Graph())
+	if strings.Contains(def, `"name"`) || strings.Contains(def, `"visible"`) {
+		t.Errorf("缺省态不应写出 name/visible 键: %s", def)
+	}
+	if !layer.NewImageLayer().Visible() {
+		t.Errorf("默认 visible = false, want true")
+	}
+	if layer.NewImageLayer().DisplayName() != "" {
+		t.Errorf("默认 name = %q, want 空串", layer.NewImageLayer().DisplayName())
+	}
+
+	// 带键形态:键序钉在 type 之后、priority 之前;visible 仅 false 写键
+	l := layer.NewImageLayer(layer.WithSize(10, 20))
+	l.SetDisplayName("标题层")
+	l.SetVisible(false)
+	want := `{"type":"ImageLayer","name":"标题层","visible":false,"priority":0,` +
+		`"spec":{"shape":{"width":10,"height":20,` +
+		`"autoWidth":false,"autoHeight":false,"lineHeight":1,` +
+		`"padding":{"top":0,"bottom":0,"left":0,"right":0},` +
+		`"border":{"top":null,"bottom":null,"left":null,"right":null},` +
+		`"backgroundColor":null},` +
+		`"align":{"horizontal":"center","vertical":"center"},` +
+		`"position":{"x":0,"y":0,"position":"top-left"}},` +
+		`"data":{"valueType":"StaticValue","value":null}}`
+	if got := jsonOf(t, l.Graph()); got != want {
+		t.Errorf("带键 graph JSON 不符:\n got  %s\n want %s", got, want)
+	}
+
+	// 往返恒等:解码读取 name/visible,再序列化字节一致
+	var node layer.Node
+	if err := json.Unmarshal([]byte(want), &node); err != nil {
+		t.Fatalf("解码 graph 节点: %v", err)
+	}
+	rebuilt := layer.ImageFromGraph(node)
+	if rebuilt.DisplayName() != "标题层" || rebuilt.Visible() {
+		t.Errorf("重建 name/visible = (%q, %t), want (标题层, false)", rebuilt.DisplayName(), rebuilt.Visible())
+	}
+	if got := jsonOf(t, rebuilt.Graph()); got != want {
+		t.Errorf("往返 graph 不恒等:\n got  %s\n want %s", got, want)
+	}
+
+	// 第三方缺省值形态(name 空串、visible true)归一为缺省 → 再序列化键省略
+	var norm layer.Node
+	if err := json.Unmarshal([]byte(`{"type":"ImageLayer","name":"","visible":true,"priority":0}`), &norm); err != nil {
+		t.Fatalf("解码缺省值形态: %v", err)
+	}
+	normalized := jsonOf(t, layer.ImageFromGraph(norm).Graph())
+	if strings.Contains(normalized, `"name"`) || strings.Contains(normalized, `"visible"`) {
+		t.Errorf("缺省值形态未归一: %s", normalized)
 	}
 }

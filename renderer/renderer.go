@@ -54,12 +54,22 @@ func New(backend Backend, rs *resolver.ResourceResolver) Renderer {
 }
 
 // Render implements Renderer:建面 → 逐层 paint(绘制分派前按需物化)→ 收尾。
-// 失败即抛、渲染面丢弃、无产物逃逸(begin 已调用但 end 不达)
+// 失败即抛、渲染面丢弃、无产物逃逸(begin 已调用但 end 不达)。
+// 根层渲染循环跳过 visible=false(layer-panel-ux 工单 01,隐藏=最终输出排除):
+// 过滤在建面循环之前,隐藏层的绘制分派与惰性物化均不发生
 func (r *template) Render(ctx context.Context, c *canvas.Canvas) (any, error) {
-	return r.renderSurface(ctx, c.Width(), c.Height(), c.GetLayers())
+	layers := c.GetLayers()
+	visible := make([]layer.Layer, 0, len(layers))
+	for _, l := range layers {
+		if l.Visible() {
+			visible = append(visible, l)
+		}
+	}
+	return r.renderSurface(ctx, c.Width(), c.Height(), visible)
 }
 
-// RenderLayer implements Renderer:以其自身尺寸建面,物化时机同 Render(惰性)
+// RenderLayer implements Renderer:以其自身尺寸建面,物化时机同 Render(惰性)。
+// 不做显隐过滤——visible 语义属画布渲染循环,单图层渲染所见即所得
 func (r *template) RenderLayer(ctx context.Context, l layer.Layer) (any, error) {
 	p, ok := l.(paintable)
 	if !ok {

@@ -152,6 +152,25 @@ func TestRenderResolvesAnchorWithinCanvas(t *testing.T) {
 	}
 }
 
+// visible=false 的根图层渲染跳过(layer-panel-ux 工单 01,隐藏=最终输出排除):
+// 隐藏层在渲染序末位(视觉最上层),若未被跳过会盖住可见层;
+// 跳过发生在绘制分派之前,隐藏层不触达任何原语
+func TestRenderSkipsHiddenRootLayers(t *testing.T) {
+	visible := layer.NewImageLayer(layer.WithSize(40, 20), layer.WithBackground("#0f0"))
+	hidden := layer.NewImageLayer(layer.WithSize(40, 20), layer.WithBackground("#f00"))
+	hidden.SetVisible(false)
+	backend := &fakeBackend{}
+	r := newRenderer(t, backend)
+
+	if _, err := r.Render(context.Background(), canvas.New(40, 20, visible, hidden)); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	assertOps(t, backend.ops, []string{"begin", "rect", "end"})
+	if backend.rects[0].bg == nil || *backend.rects[0].bg != "#0f0" {
+		t.Errorf("只应绘制可见层: got bg %v", backend.rects[0].bg)
+	}
+}
+
 func TestRenderLayerUsesLayerOwnSizeAsSurface(t *testing.T) {
 	// 单图层便捷渲染:以图层自身尺寸为面
 	l := layer.NewImageLayer(layer.WithSize(30, 20))
@@ -391,6 +410,7 @@ type alienLayer struct{}
 
 func (alienLayer) TypeName() string  { return "AlienLayer" }
 func (alienLayer) Priority() int     { return 0 }
+func (alienLayer) Visible() bool     { return true }
 func (alienLayer) Graph() layer.Node { return layer.Node{Type: "AlienLayer"} }
 
 func TestUnknownLayerTypeAbortsRender(t *testing.T) {
