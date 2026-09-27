@@ -1,4 +1,4 @@
-package expand
+package hydrate
 
 import (
 	"bytes"
@@ -10,31 +10,31 @@ import (
 	"github.com/hankchen/go-canvas/layer"
 )
 
-// Expander 展开器(spec §4.2):渲染前的独立纯结构步骤。
+// Hydrator 填充器(spec §4.2):渲染前的独立纯结构步骤。
 //
 // 数据集裁决(spec 未定义态的裁定,PHP 权威实现同款):dataset == nil = 未绑
-// 数据集,全画布恒等直通——含模板表的画布不展开,模板表以声明态进入渲染、
+// 数据集,全画布恒等直通——含模板表的画布不填充,模板表以声明态进入渲染、
 // 按零行空壳呈现(与 §4.4「空数组 = 合法零行、模板空数据不特殊」同精神);
-// 传具体数据 = 已绑,展开语义全量生效(含 rows_path_invalid 等结构性报错)。
+// 传具体数据 = 已绑,填充语义全量生效(含 rows_path_invalid 等结构性报错)。
 //
 // 断行/度量不做注入:TextLayer 自携带 LineBreaker/Measurer 策略,高度定稿经
 // canvas.FromGraph 的解码路径完成(V1 高度耦合重放,spec §4.2 字面偏离但
-// 功能等价,与 PHP 展开器同款裁决)
-type Expander struct {
+// 功能等价,与 PHP 填充器同款裁决)
+type Hydrator struct {
 	evaluator ExpressionEvaluator
 }
 
-// NewExpander 构造展开器;evaluator 为 nil 时用默认受限插值求值器
-func NewExpander(evaluator ExpressionEvaluator) *Expander {
+// NewHydrator 构造填充器;evaluator 为 nil 时用默认受限插值求值器
+func NewHydrator(evaluator ExpressionEvaluator) *Hydrator {
 	if evaluator == nil {
 		evaluator = NewInterpolationEvaluator()
 	}
-	return &Expander{evaluator: evaluator}
+	return &Hydrator{evaluator: evaluator}
 }
 
-// Expand 展开:全画布标记字段求值 + 模板表实例化。展开走 graph 层改写 +
+// Hydrate 填充:全画布标记字段求值 + 模板表实例化。填充走 graph 层改写 +
 // canvas.FromGraph 重建,求值结果永不回写源 graph;identity 场景返回原画布
-func (e *Expander) Expand(c *canvas.Canvas, dataset any) (*canvas.Canvas, error) {
+func (h *Hydrator) Hydrate(c *canvas.Canvas, dataset any) (*canvas.Canvas, error) {
 	// 未绑数据集:不跑求值器,全字面(标记字段按 value 镜像显示原文),存量行为零变化
 	if dataset == nil {
 		return c, nil
@@ -51,7 +51,7 @@ func (e *Expander) Expand(c *canvas.Canvas, dataset any) (*canvas.Canvas, error)
 	}
 
 	for i := range graph.Layers {
-		if err := e.expandNode(&graph.Layers[i], root, nil); err != nil {
+		if err := h.hydrateNode(&graph.Layers[i], root, nil); err != nil {
 			return nil, err
 		}
 	}
@@ -64,7 +64,7 @@ func hasTemplate(raw json.RawMessage) bool {
 	return raw != nil && !bytes.Equal(bytes.TrimSpace(raw), []byte("null"))
 }
 
-// graphHasBindings 图上是否存在表达式标记或模板表(决定是否进入展开流程)
+// graphHasBindings 图上是否存在表达式标记或模板表(决定是否进入填充流程)
 func graphHasBindings(nodes []layer.Node) bool {
 	for i := range nodes {
 		node := &nodes[i]
@@ -91,27 +91,27 @@ func graphHasBindings(nodes []layer.Node) bool {
 	return false
 }
 
-// expandNode 展开单个 graph 节点:求值标记字段 + 结构子树递归(行/格/内容同作用域传递)。
+// hydrateNode 填充单个 graph 节点:求值标记字段 + 结构子树递归(行/格/内容同作用域传递)。
 // rowNamespace 为 nil = 非行上下文,非 nil = 行上下文("row" + "$index")
-func (e *Expander) expandNode(node *layer.Node, root map[string]any, rowNamespace map[string]any) error {
+func (h *Hydrator) hydrateNode(node *layer.Node, root map[string]any, rowNamespace map[string]any) error {
 	if node.Type == layer.TypeTable && hasTemplate(node.Template) {
-		return e.expandTemplateNode(node, root, rowNamespace)
+		return h.hydrateTemplateNode(node, root, rowNamespace)
 	}
 
-	if err := e.evaluateNode(node, root, rowNamespace); err != nil {
+	if err := h.evaluateNode(node, root, rowNamespace); err != nil {
 		return err
 	}
 
 	if node.Rows != nil {
 		for i := range *node.Rows {
-			if err := e.expandNode(&(*node.Rows)[i], root, rowNamespace); err != nil {
+			if err := h.hydrateNode(&(*node.Rows)[i], root, rowNamespace); err != nil {
 				return err
 			}
 		}
 	}
 	if node.Cells != nil {
 		for i := range *node.Cells {
-			if err := e.expandNode(&(*node.Cells)[i], root, rowNamespace); err != nil {
+			if err := h.hydrateNode(&(*node.Cells)[i], root, rowNamespace); err != nil {
 				return err
 			}
 		}
@@ -121,7 +121,7 @@ func (e *Expander) expandNode(node *layer.Node, root map[string]any, rowNamespac
 		if err := json.Unmarshal(node.Content, &contentNode); err != nil {
 			return fmt.Errorf("解码 content: %w", err)
 		}
-		if err := e.expandNode(&contentNode, root, rowNamespace); err != nil {
+		if err := h.hydrateNode(&contentNode, root, rowNamespace); err != nil {
 			return err
 		}
 		node.Content = marshalNode(contentNode)
@@ -129,10 +129,10 @@ func (e *Expander) expandNode(node *layer.Node, root map[string]any, rowNamespac
 	return nil
 }
 
-// expandTemplateNode 模板表实例化:rowsPath 定位行数组 → 每行求值 → 模板行改写
+// hydrateTemplateNode 模板表实例化:rowsPath 定位行数组 → 每行求值 → 模板行改写
 // 为具体行。行高定稿由 canvas.FromGraph 的 V1 耦合重放完成(声明态豁免在此闭环);
 // 嵌套模板表(模板格内容含 TableLayer)的 rowsPath 以当前行数据为取数范围(行相对)
-func (e *Expander) expandTemplateNode(node *layer.Node, root map[string]any, rowNamespace map[string]any) error {
+func (h *Hydrator) hydrateTemplateNode(node *layer.Node, root map[string]any, rowNamespace map[string]any) error {
 	rowsPath := ""
 	if node.Data != nil {
 		rowsPath = node.Data.RowsPath
@@ -160,7 +160,7 @@ func (e *Expander) expandTemplateNode(node *layer.Node, root map[string]any, row
 			return fmt.Errorf("解码模板行: %w", err)
 		}
 		serial++
-		if err := e.expandNode(&rowNode, root, map[string]any{"row": item, "$index": serial}); err != nil {
+		if err := h.hydrateNode(&rowNode, root, map[string]any{"row": item, "$index": serial}); err != nil {
 			return err
 		}
 		rowNode.Type = layer.TypeTableRow
@@ -196,10 +196,10 @@ func navigateRows(scope any, rowsPath string) ([]any, error) {
 	return rows, nil
 }
 
-// evaluateNode 标记字段求值:求值结果替换为字面值并解除标记(展开产物无表达式)。
+// evaluateNode 标记字段求值:求值结果替换为字面值并解除标记(填充产物无表达式)。
 // 缺字段信号(空串)由本层按字段类施加策略:文案兜底空串、资源类报错(spec §3.4);
 // 门控三条件 = valueType 标记 + expression 在场 + 绑定面三类内容层(spec §3.1)
-func (e *Expander) evaluateNode(node *layer.Node, root map[string]any, rowNamespace map[string]any) error {
+func (h *Hydrator) evaluateNode(node *layer.Node, root map[string]any, rowNamespace map[string]any) error {
 	if node.Data == nil || node.Data.ValueType != layer.ValueTypeExpression || node.Data.Expression == nil {
 		return nil
 	}
@@ -226,7 +226,7 @@ func (e *Expander) evaluateNode(node *layer.Node, root map[string]any, rowNamesp
 		}
 	}
 
-	result, err := e.evaluator.Evaluate(*node.Data.Expression, context)
+	result, err := h.evaluator.Evaluate(*node.Data.Expression, context)
 	if err != nil {
 		return err
 	}

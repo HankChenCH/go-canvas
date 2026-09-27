@@ -14,8 +14,8 @@ import (
 
 // TableLayer 表格图层(行容器)。V2 模板态(spec §2):声明 TableRowTemplate +
 // data.rowsPath,与 rows XOR 互斥——wire 上 template/data 为条件写键(模板态不写
-// rows,V1 态不写 template/data,字节面保三端 parity);展开在渲染前的独立纯结构
-// 步骤完成(expand 包),展开产物不回写本图层(往返恒等对象 = 声明态)
+// rows,V1 态不写 template/data,字节面保三端 parity);填充在渲染前的独立纯结构
+// 步骤完成(hydrate 包),填充产物不回写本图层(往返恒等对象 = 声明态)
 type TableLayer struct {
 	base
 	rows []*TableRowLayer
@@ -25,7 +25,7 @@ type TableLayer struct {
 
 	// template 行模板声明(V2):非 nil = 模板态,与 rows 互斥
 	template *TableRowTemplate
-	// rowsPath 取行路径(点路径字符串):仅模板态参与展开与 wire 写键(spec §3.3)
+	// rowsPath 取行路径(点路径字符串):仅模板态参与填充与 wire 写键(spec §3.3)
 	rowsPath string
 }
 
@@ -81,8 +81,8 @@ func (l *TableLayer) SetTemplate(template *TableRowTemplate) {
 // Template 声明的行模板;未声明为 nil
 func (l *TableLayer) Template() *TableRowTemplate { return l.template }
 
-// SetRowsPath 取行路径(点路径字符串,spec §3.3):展开时从数据集(嵌套模板表
-// 则从当前行数据)定位行数组;仅模板态参与展开与 wire 写键
+// SetRowsPath 取行路径(点路径字符串,spec §3.3):填充时从数据集(嵌套模板表
+// 则从当前行数据)定位行数组;仅模板态参与填充与 wire 写键
 func (l *TableLayer) SetRowsPath(rowsPath string) { l.rowsPath = rowsPath }
 
 // RowsPath 取行路径
@@ -262,7 +262,7 @@ func (l *TableCellLayer) AddContentLayer(content contentLayer) {
 func (l *TableCellLayer) ContentLayer() Layer { return l.content }
 
 // AddTemplateContentLayer 模板上下文装配(TableLayer V2,spec §2.3):只同步内容层宽
-// = 格宽,高度耦合全豁免——声明高与 autoHeight 标志原样保留,实例高度由展开定稿
+// = 格宽,高度耦合全豁免——声明高与 autoHeight 标志原样保留,实例高度由填充定稿
 func (l *TableCellLayer) AddTemplateContentLayer(content contentLayer) {
 	content.setWidth(l.Width())
 	l.content = content

@@ -1,11 +1,11 @@
-// Package expand 展开步骤(TableLayer V2,spec §4.2):渲染前的独立纯结构步骤,
-// expand(Canvas, dataset) → Canvas——全画布标记字段求值 + 模板表实例化,
+// Package hydrate 数据填充步骤(TableLayer V2,spec §4.2):渲染前的独立纯结构步骤,
+// hydrate(Canvas, dataset) → Canvas——全画布标记字段求值 + 模板表实例化,
 // 产出具体树(无模板、无表达式、高度定稿)。数据维度前置、资源维度后移
 // (渲染期物化),两维度分离;本包为零依赖纯结构侧(不引渲染/图像库)。
 //
 // 实现走 graph 层改写 + canvas.FromGraph 重建:V1 尺寸耦合重放由解码路径承担
 // (行高定稿/固定格压平免费来自 TableFromGraph→AddRow,PHP 权威实现同款策略)。
-package expand
+package hydrate
 
 import (
 	"encoding/json"
@@ -15,8 +15,8 @@ import (
 	"strings"
 )
 
-// 展开期错误稳定 code(spec §5.2,三端一致性抓手:消息可本地化,code 稳定;
-// PHP 侧对位 ExpandException.getErrorCode,errors.Is 判定)
+// 填充期错误稳定 code(spec §5.2,三端一致性抓手:消息可本地化,code 稳定;
+// PHP 侧对位 HydrateException.getErrorCode,errors.Is 判定)
 var (
 	// ErrRowsPathInvalid rowsPath 指向缺键/null/非数组(spec §4.4,结构性错误 fail-fast)
 	ErrRowsPathInvalid = errors.New("rows_path_invalid")
@@ -36,9 +36,9 @@ var (
 
 // ExpressionEvaluator 表达式求值器注入缝(spec §3.6,与 PHP
 // Contracts/ExpressionEvaluatorInterface 同构):门控(valueType 标记)与字段类
-// 错误策略留在展开器侧、不可被替换;上下文形状为契约层钉定(spec §3.2)——
+// 错误策略留在填充器侧、不可被替换;上下文形状为契约层钉定(spec §3.2)——
 // "row" 键 = 行命名空间、裸名 = 数据集根键、$index(自 1 起)/$root 保留名。
-// 缺字段/null 信号 = 空串(展开器按字段类施加兜底/报错);
+// 缺字段/null 信号 = 空串(填充器按字段类施加兜底/报错);
 // 类型不匹配返回 expression_type_mismatch 错误
 type ExpressionEvaluator interface {
 	Evaluate(template string, context map[string]any) (string, error)

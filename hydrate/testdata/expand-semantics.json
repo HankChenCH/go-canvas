@@ -1,14 +1,14 @@
 {
     "meta": {
         "contract": "expand-semantics v1",
-        "generator": "php-canvas-next/scripts/export-expand-fixtures.php",
+        "generator": "php-canvas-next/scripts/export-hydrate-fixtures.php",
         "notes": [
-            "展开步骤语义用例，语义源 php-canvas-next tests/Expand/CanvasExpanderTest.php 逐用例平移（另含 QR/嵌套两个扩覆盖用例）；",
-            "runner 管线 = graph → 反序列化重建 → expand(dataset) → graph，与 PHP 导出管线同构（Go: canvas.FromGraph → expand）；",
-            "解码期错误（template_rows_conflict/rows_path_missing）与展开期错误同管线表达，expect = {graph} | {errorCode}（spec §5.2）；",
+            "数据填充（hydrate）语义用例，语义源 php-canvas-next tests/Hydrate/CanvasHydratorTest.php 逐用例平移（另含 QR/嵌套两个扩覆盖用例）；",
+            "runner 管线 = graph → 反序列化重建 → hydrate(dataset) → graph，与 PHP 导出管线同构（Go: canvas.FromGraph → hydrate）；",
+            "解码期错误（template_rows_conflict/rows_path_missing）与填充期错误同管线表达，expect = {graph} | {errorCode}（spec §5.2）；",
             "dataset null = 未绑数据集恒等直通（含模板表）；无标记无模板画布恒等直通；",
-            "展开产物 graph 已含 V1 高度耦合重放结果（行高定稿/固定格内容压平），展开永不回写源 graph；",
-            "再生成: go-canvas 仓 make expand-fixtures（需本机 PHP 8.3）"
+            "填充产物 graph 已含 V1 高度耦合重放结果（行高定稿/固定格内容压平），填充永不回写源 graph；",
+            "再生成: go-canvas 仓 make hydrate-fixtures（需本机 PHP 8.3）"
         ]
     },
     "cases": [

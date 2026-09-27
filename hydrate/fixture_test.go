@@ -1,10 +1,11 @@
-package expand_test
+package hydrate_test
 
 // 三端共享 fixture runner(go-canvas 工票 12,spec §7):
-// expand/testdata/expression-eval.json(expression-eval v1)+ expand-semantics.json
-// (expand-semantics v1),由 php-canvas-next/scripts/export-expand-fixtures.php
-// 产出(make expand-fixtures)。runner 管线与 PHP 导出端同构:
-// graph → 反序列化重建 → expand(dataset) → graph;解码期/展开期错误以
+// hydrate/testdata/expression-eval.json(expression-eval v1)+ expand-semantics.json
+// (expand-semantics v1,契约 id 与文件名不随更名,锁输出字节面),
+// 由 php-canvas-next/scripts/export-hydrate-fixtures.php
+// 产出(make hydrate-fixtures)。runner 管线与 PHP 导出端同构:
+// graph → 反序列化重建 → hydrate(dataset) → graph;解码期/填充期错误以
 // 稳定 code 断言(spec §5.2)。canvas-web 适配后可复用本 fixture。
 
 import (
@@ -14,29 +15,29 @@ import (
 	"testing"
 
 	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/expand"
+	"github.com/hankchen/go-canvas/hydrate"
 	"github.com/hankchen/go-canvas/layer"
 )
 
-// expandErrorCodes 稳定 code → sentinel 映射(跨包汇总解码期与展开期;
+// hydrateErrorCodes 稳定 code → sentinel 映射(跨包汇总解码期与填充期;
 // fixture errorCode 字符串经它对位 errors.Is)
-var expandErrorCodes = map[string]error{
+var hydrateErrorCodes = map[string]error{
 	"unknown_layer_type":          layer.ErrUnknownLayerType,
 	"template_rows_conflict":      layer.ErrTemplateRowsConflict,
 	"rows_path_missing":           layer.ErrRowsPathMissing,
-	"rows_path_invalid":           expand.ErrRowsPathInvalid,
-	"expression_row_outside_loop": expand.ErrExpressionRowOutsideLoop,
-	"reserved_root_key":           expand.ErrReservedRootKey,
-	"expression_empty_resource":   expand.ErrExpressionEmptyResource,
-	"expression_type_mismatch":    expand.ErrExpressionTypeMismatch,
-	"expression_syntax_error":     expand.ErrExpressionSyntaxError,
+	"rows_path_invalid":           hydrate.ErrRowsPathInvalid,
+	"expression_row_outside_loop": hydrate.ErrExpressionRowOutsideLoop,
+	"reserved_root_key":           hydrate.ErrReservedRootKey,
+	"expression_empty_resource":   hydrate.ErrExpressionEmptyResource,
+	"expression_type_mismatch":    hydrate.ErrExpressionTypeMismatch,
+	"expression_syntax_error":     hydrate.ErrExpressionSyntaxError,
 }
 
 // fixtureErrorCode 定位错误对应的稳定 code;不在 code 集内的错误直接失败
 // (静默放行会让 fixture 失去一致性锚点作用)
 func fixtureErrorCode(t *testing.T, err error) string {
 	t.Helper()
-	for code, sentinel := range expandErrorCodes {
+	for code, sentinel := range hydrateErrorCodes {
 		if errors.Is(err, sentinel) {
 			return code
 		}
@@ -88,7 +89,7 @@ func TestExpressionEvalFixture(t *testing.T) {
 		t.Fatalf("contract = %q, want expression-eval v1", doc.Meta.Contract)
 	}
 
-	evaluator := expand.NewInterpolationEvaluator()
+	evaluator := hydrate.NewInterpolationEvaluator()
 	for _, tc := range doc.Cases {
 		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
@@ -141,11 +142,11 @@ func TestExpandSemanticsFixture(t *testing.T) {
 		t.Fatalf("contract = %q, want expand-semantics v1", doc.Meta.Contract)
 	}
 
-	expander := expand.NewExpander(nil)
+	hydrator := hydrate.NewHydrator(nil)
 	for _, tc := range doc.Cases {
 		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
-			// 管线 = graph → canvas.FromGraph → expand(dataset)(与 PHP 导出端同构)
+			// 管线 = graph → canvas.FromGraph → hydrate(dataset)(与 PHP 导出端同构)
 			var wire canvas.Graph
 			if err := json.Unmarshal(tc.Graph, &wire); err != nil {
 				t.Fatalf("解码画布 graph: %v", err)
@@ -157,15 +158,15 @@ func TestExpandSemanticsFixture(t *testing.T) {
 
 			decoded, err := canvas.FromGraph(wire)
 			if err == nil {
-				expanded, expErr := expander.Expand(decoded, ds)
-				err = expErr
+				hydrated, hydErr := hydrator.Hydrate(decoded, ds)
+				err = hydErr
 				if err == nil {
 					// expect = {graph} | {errorCode}
 					var wantErr struct {
 						ErrorCode string `json:"errorCode"`
 					}
 					if jsonErr := json.Unmarshal(tc.Expect, &wantErr); jsonErr == nil && wantErr.ErrorCode != "" {
-						t.Fatalf("预期错误 %s,但展开成功", wantErr.ErrorCode)
+						t.Fatalf("预期错误 %s,但填充成功", wantErr.ErrorCode)
 					}
 					var want struct {
 						Graph json.RawMessage `json:"graph"`
@@ -173,10 +174,10 @@ func TestExpandSemanticsFixture(t *testing.T) {
 					if err := json.Unmarshal(tc.Expect, &want); err != nil {
 						t.Fatalf("解码预期: %v", err)
 					}
-					got := normalizeJSON(t, expanded.Graph())
+					got := normalizeJSON(t, hydrated.Graph())
 					wantAny := normalizeJSON(t, json.RawMessage(want.Graph))
 					if !jsonDeepEqual(got, wantAny) {
-						t.Errorf("展开产物 graph 与预期不符:\n got  %s\n want %s", mustJSON(got), mustJSON(wantAny))
+						t.Errorf("填充产物 graph 与预期不符:\n got  %s\n want %s", mustJSON(got), mustJSON(wantAny))
 					}
 					return
 				}

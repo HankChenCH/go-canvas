@@ -1,14 +1,14 @@
 {
     "meta": {
         "contract": "expression-eval v1",
-        "generator": "php-canvas-next/scripts/export-expand-fixtures.php",
+        "generator": "php-canvas-next/scripts/export-hydrate-fixtures.php",
         "notes": [
             "默认求值器（受限插值）语义用例，语义源 php-canvas-next tests/Expression/InterpolationEvaluatorTest.php 逐用例平移；",
             "context 形状为契约层钉定（spec §3.2）：row 键 = 行命名空间、裸名 = 数据集根键、$index（自 1 起）/$root 保留名；",
-            "缺字段/null = 空串信号（字段类兜底/报错策略由展开器施加，spec §3.4）；数组/对象落到标量位 = expression_type_mismatch；",
+            "缺字段/null = 空串信号（字段类兜底/报错策略由填充器施加）；数组/对象落到标量位 = expression_type_mismatch；",
             "expect = 求值结果串 | {errorCode}；code 清单见 spec §5.2，三端一致性抓手；",
             "数值字符串化只锁常规区间（整数/常规小数）；极端浮点（科学计数法阈值）的格式化语义归求值器 spec effort，不入 fixture；",
-            "再生成: go-canvas 仓 make expand-fixtures（需本机 PHP 8.3）"
+            "再生成: go-canvas 仓 make hydrate-fixtures（需本机 PHP 8.3）"
         ]
     },
     "cases": [

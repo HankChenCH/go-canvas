@@ -1,21 +1,21 @@
 package imagerenderer
 
-// TableLayer V2 全链路像素断言(工票 12):声明态模板表 → expand(dataset) →
+// TableLayer V2 全链路像素断言(工票 12):声明态模板表 → hydrate(dataset) →
 // 位图渲染,验收 = 用户可见像素——行实例化、行高定稿(V1 耦合重放)、表达式
 // 求值、本地资源经惰性物化直画、空数据空壳。对拍基准 = php-canvas-image-renderer
-// 的 V2 全链路像素断言;标准管线 = Render(expand(canvas, dataset))(spec §0)。
+// 的 V2 全链路像素断言;标准管线 = Render(hydrate(canvas, dataset))(spec §0)。
 
 import (
 	"context"
 	"testing"
 
 	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/expand"
+	"github.com/hankchen/go-canvas/hydrate"
 	"github.com/hankchen/go-canvas/layer"
 )
 
 // v2TemplateTable 模板表:红格(auto 文本格,行上下文求值)+ 蓝格(固定 40,
-// 图片格,表达式指向本地 PNG)。展开后行高 = max(文本 12, 格 40) = 40
+// 图片格,表达式指向本地 PNG)。填充后行高 = max(文本 12, 格 40) = 40
 func v2TemplateTable(t *testing.T, avatarPath string) *layer.TableLayer {
 	t.Helper()
 	textContent := layer.NewTextLayer(layer.WithSize(160, 0), layer.WithAutoHeight(), layer.WithFont("", 12, "#000"))
@@ -39,7 +39,7 @@ func v2TemplateTable(t *testing.T, avatarPath string) *layer.TableLayer {
 }
 
 func TestTemplateTableFullPipelineRendersRows(t *testing.T) {
-	// 全链路:模板表声明态 → 展开两行 → 位图。行 1 y 0..40、行 2 y 40..80,
+	// 全链路:模板表声明态 → 填充两行 → 位图。行 1 y 0..40、行 2 y 40..80,
 	// 红格(背景)与绿图(本地路径经惰性物化直画)按实例化位置落位
 	avatarPath := solidPng(t, 160, 40, green)
 	source := canvas.New(320, 200, v2TemplateTable(t, avatarPath))
@@ -53,11 +53,11 @@ func TestTemplateTableFullPipelineRendersRows(t *testing.T) {
 		},
 	}
 
-	expanded, err := expand.NewExpander(nil).Expand(source, dataset)
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(source, dataset)
 	if err != nil {
-		t.Fatalf("Expand: %v", err)
+		t.Fatalf("Hydrate: %v", err)
 	}
-	product, err := newRenderer(t).Render(context.Background(), expanded)
+	product, err := newRenderer(t).Render(context.Background(), hydrated)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -80,11 +80,11 @@ func TestTemplateTableEmptyDatasetRendersShell(t *testing.T) {
 	source := canvas.New(320, 200, v2TemplateTable(t, avatarPath))
 	dataset := map[string]any{"order": map[string]any{"items": []any{}}}
 
-	expanded, err := expand.NewExpander(nil).Expand(source, dataset)
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(source, dataset)
 	if err != nil {
-		t.Fatalf("Expand: %v", err)
+		t.Fatalf("Hydrate: %v", err)
 	}
-	product, err := newRenderer(t).Render(context.Background(), expanded)
+	product, err := newRenderer(t).Render(context.Background(), hydrated)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
@@ -100,14 +100,14 @@ func TestTemplateTableNullDatasetRendersDeclarationShell(t *testing.T) {
 	avatarPath := solidPng(t, 160, 40, green)
 	source := canvas.New(320, 200, v2TemplateTable(t, avatarPath))
 
-	expanded, err := expand.NewExpander(nil).Expand(source, nil)
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(source, nil)
 	if err != nil {
-		t.Fatalf("Expand: %v", err)
+		t.Fatalf("Hydrate: %v", err)
 	}
-	if expanded != source {
+	if hydrated != source {
 		t.Fatal("dataset null 必须恒等直通")
 	}
-	product, err := newRenderer(t).Render(context.Background(), expanded)
+	product, err := newRenderer(t).Render(context.Background(), hydrated)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}

@@ -94,7 +94,7 @@ func TestTemplateStateRowsPathOmittedKeepsDataKeyAbsent(t *testing.T) {
 
 func TestTableTemplateStateRoundtrip(t *testing.T) {
 	// 声明态往返恒等（spec §2.4）+ 模板装配高度豁免:解码不重放 V1 高度耦合,
-	// 格/内容的声明高与 auto 标志原样保留（实例高度由展开定稿）
+	// 格/内容的声明高与 auto 标志原样保留（实例高度由填充定稿）
 	table := templateTableFixture()
 
 	var node layer.Node

@@ -95,7 +95,7 @@ func TestQrExpressionConditionalKeys(t *testing.T) {
 }
 
 func TestMarkedLayersFromGraphRoundtrip(t *testing.T) {
-	// 标记态 wire → 解码 → graph 恒等（门控恢复标记,求值语义归展开步骤）
+	// 标记态 wire → 解码 → graph 恒等（门控恢复标记,求值语义归填充步骤）
 	text := layer.NewTextLayer(layer.WithSize(100, 30), layer.WithFont("", 12, "#000"))
 	text.SetExpression("姓名：{{row.name}}（{{$index}}）")
 	image := layer.NewImageLayer(layer.WithSize(60, 60))

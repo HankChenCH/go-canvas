@@ -1,6 +1,6 @@
-package expand_test
+package hydrate_test
 
-// 展开步骤单测(对拍基准 = php-canvas-next tests/Expand/CanvasExpanderTest.php 逐用例平移;
+// 填充步骤单测(对拍基准 = php-canvas-next tests/Hydrate/CanvasHydratorTest.php 逐用例平移;
 // 共享 fixture 语义由 fixture_test.go 的 runner 覆盖,本文件补 Go 特有面:
 // 同对象恒等、源图不污染、struct 数据集归一、求值器注入)。
 
@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/expand"
+	"github.com/hankchen/go-canvas/hydrate"
 	"github.com/hankchen/go-canvas/layer"
 )
 
@@ -59,43 +59,43 @@ func dataset() map[string]any {
 	}
 }
 
-func firstTable(t *testing.T, expanded *canvas.Canvas) *layer.TableLayer {
+func firstTable(t *testing.T, hydrated *canvas.Canvas) *layer.TableLayer {
 	t.Helper()
-	table, ok := expanded.GetLayers()[0].(*layer.TableLayer)
+	table, ok := hydrated.GetLayers()[0].(*layer.TableLayer)
 	if !ok {
-		t.Fatalf("首图层类型 = %T, want *layer.TableLayer", expanded.GetLayers()[0])
+		t.Fatalf("首图层类型 = %T, want *layer.TableLayer", hydrated.GetLayers()[0])
 	}
 	return table
 }
 
-func TestExpandTemplateTableInstantiatesRows(t *testing.T) {
-	expanded, err := expand.NewExpander(nil).Expand(
+func TestHydrateTemplateTableInstantiatesRows(t *testing.T) {
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(
 		canvas.New(320, 400, templateTable()), dataset())
 	if err != nil {
-		t.Fatalf("Expand: %v", err)
+		t.Fatalf("Hydrate: %v", err)
 	}
 
-	table := firstTable(t, expanded)
+	table := firstTable(t, hydrated)
 	// 行实例化:两行数据,template/data 键消失,rows 键出现
 	if rows := table.Rows(); len(rows) != 2 {
 		t.Fatalf("行数 = %d, want 2", len(rows))
 	}
 	if table.Graph().Template != nil || table.Graph().Data != nil {
-		t.Error("展开产物不得残留 template/data 键")
+		t.Error("填充产物不得残留 template/data 键")
 	}
 	if table.Graph().Rows == nil {
-		t.Error("展开产物 rows 键必须出现")
+		t.Error("填充产物 rows 键必须出现")
 	}
 }
 
 func TestRowContextEvaluationAndOneBasedIndex(t *testing.T) {
-	expanded, err := expand.NewExpander(nil).Expand(
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(
 		canvas.New(320, 400, templateTable()), dataset())
 	if err != nil {
-		t.Fatalf("Expand: %v", err)
+		t.Fatalf("Hydrate: %v", err)
 	}
 
-	rows := firstTable(t, expanded).Rows()
+	rows := firstTable(t, hydrated).Rows()
 	text1 := rows[0].Cells()[0].ContentLayer().(*layer.TextLayer)
 	if got := text1.Text(); got != "姓名：张三（1）" {
 		t.Errorf("行 1 文本 = %q, want 姓名：张三（1）($index 自 1 起)", got)
@@ -114,15 +114,15 @@ func TestRowContextEvaluationAndOneBasedIndex(t *testing.T) {
 	}
 }
 
-func TestExpandedHeightsFinalizedByV1CouplingReplay(t *testing.T) {
-	expanded, err := expand.NewExpander(nil).Expand(
+func TestHydratedHeightsFinalizedByV1CouplingReplay(t *testing.T) {
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(
 		canvas.New(320, 400, templateTable()), dataset())
 	if err != nil {
-		t.Fatalf("Expand: %v", err)
+		t.Fatalf("Hydrate: %v", err)
 	}
 
-	// 宽在声明态同步:行宽 = 表宽;高在展开态定稿:行高取最高格(V1 耦合重放)
-	row := firstTable(t, expanded).Rows()[0]
+	// 宽在声明态同步:行宽 = 表宽;高在填充态定稿:行高取最高格(V1 耦合重放)
+	row := firstTable(t, hydrated).Rows()[0]
 	if got := row.Width(); got != 320 {
 		t.Errorf("行宽 = %d, want 320", got)
 	}
@@ -142,15 +142,15 @@ func TestExpandedHeightsFinalizedByV1CouplingReplay(t *testing.T) {
 	}
 }
 
-func TestExpandDoesNotPolluteSourceCanvas(t *testing.T) {
+func TestHydrateDoesNotPolluteSourceCanvas(t *testing.T) {
 	source := canvas.New(320, 400, templateTable())
 	graphBefore := source.Graph()
 
-	if _, err := expand.NewExpander(nil).Expand(source, dataset()); err != nil {
-		t.Fatalf("Expand: %v", err)
+	if _, err := hydrate.NewHydrator(nil).Hydrate(source, dataset()); err != nil {
+		t.Fatalf("Hydrate: %v", err)
 	}
 
-	// 展开产物与源图分离:源仍是声明态
+	// 填充产物与源图分离:源仍是声明态
 	if got, want := jsonOf(t, source.Graph()), jsonOf(t, graphBefore); got != want {
 		t.Errorf("源画布 graph 被污染:\n got  %s\n want %s", got, want)
 	}
@@ -165,13 +165,13 @@ func TestIndependentLayersEvaluateAtRootContext(t *testing.T) {
 	image := layer.NewImageLayer(layer.WithSize(60, 60))
 	image.SetExpression("{{orderNo}}.png")
 
-	expanded, err := expand.NewExpander(nil).Expand(
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(
 		canvas.New(320, 100, text, image), dataset())
 	if err != nil {
-		t.Fatalf("Expand: %v", err)
+		t.Fatalf("Hydrate: %v", err)
 	}
 
-	layers := expanded.GetLayers()
+	layers := hydrated.GetLayers()
 	if got := layers[0].(*layer.TextLayer).Text(); got != "订单号：A2026-001" {
 		t.Errorf("独立文本 = %q, want 订单号：A2026-001", got)
 	}
@@ -190,12 +190,12 @@ func TestV1TableMarkedContentEvaluatesAtRootScope(t *testing.T) {
 		t.Fatalf("AddRow: %v", err)
 	}
 
-	expanded, err := expand.NewExpander(nil).Expand(canvas.New(320, 400, table), dataset())
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(canvas.New(320, 400, table), dataset())
 	if err != nil {
-		t.Fatalf("Expand: %v", err)
+		t.Fatalf("Hydrate: %v", err)
 	}
 
-	rows := firstTable(t, expanded).Rows()
+	rows := firstTable(t, hydrated).Rows()
 	if len(rows) != 1 {
 		t.Fatalf("行数 = %d, want 1", len(rows))
 	}
@@ -208,11 +208,11 @@ func TestNullDatasetIsIdentityEvenWithBindings(t *testing.T) {
 	// 未绑数据集:不跑求值器,全字面(标记字段按 value 镜像显示原文)
 	source := canvas.New(320, 400, templateTable())
 
-	expanded, err := expand.NewExpander(nil).Expand(source, nil)
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(source, nil)
 	if err != nil {
-		t.Fatalf("Expand: %v", err)
+		t.Fatalf("Hydrate: %v", err)
 	}
-	if expanded != source {
+	if hydrated != source {
 		t.Error("dataset null 必须恒等直通(同一画布对象)")
 	}
 }
@@ -222,23 +222,23 @@ func TestCanvasWithoutBindingsIsIdentity(t *testing.T) {
 	source := canvas.New(320, 100, layer.NewTextLayer(
 		layer.WithSize(100, 30), layer.WithText("字面 {{orderNo}} 文案")))
 
-	expanded, err := expand.NewExpander(nil).Expand(source, dataset())
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(source, dataset())
 	if err != nil {
-		t.Fatalf("Expand: %v", err)
+		t.Fatalf("Hydrate: %v", err)
 	}
-	if expanded != source {
+	if hydrated != source {
 		t.Error("无绑定画布必须恒等直通(同一画布对象)")
 	}
 }
 
 func TestEmptyRowArrayYieldsEmptyShell(t *testing.T) {
 	ds := map[string]any{"order": map[string]any{"items": []any{}}}
-	expanded, err := expand.NewExpander(nil).Expand(canvas.New(320, 400, templateTable()), ds)
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(canvas.New(320, 400, templateTable()), ds)
 	if err != nil {
-		t.Fatalf("Expand: %v", err)
+		t.Fatalf("Hydrate: %v", err)
 	}
 
-	table := firstTable(t, expanded)
+	table := firstTable(t, hydrated)
 	// 空数组 = 合法零行,空壳渲染(表壳按声明画,行区零高)
 	if rows := table.Rows(); len(rows) != 0 {
 		t.Fatalf("行数 = %d, want 0", len(rows))
@@ -277,12 +277,12 @@ func TestNestedTemplateTableRowRelative(t *testing.T) {
 			map[string]any{"sub": []any{map[string]any{"name": "乙"}, map[string]any{"name": "丙"}}},
 		},
 	}
-	expanded, err := expand.NewExpander(nil).Expand(canvas.New(240, 400, outerTable), ds)
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(canvas.New(240, 400, outerTable), ds)
 	if err != nil {
-		t.Fatalf("Expand: %v", err)
+		t.Fatalf("Hydrate: %v", err)
 	}
 
-	outerRows := firstTable(t, expanded).Rows()
+	outerRows := firstTable(t, hydrated).Rows()
 	if len(outerRows) != 2 {
 		t.Fatalf("外层行数 = %d, want 2", len(outerRows))
 	}
@@ -308,11 +308,11 @@ func TestRowsPathErrors(t *testing.T) {
 		dataset map[string]any
 		wantErr error
 	}{
-		{"缺键", map[string]any{"orderNo": "A2026-001"}, expand.ErrRowsPathInvalid},
-		{"非数组", map[string]any{"order": map[string]any{"items": "not-an-array"}}, expand.ErrRowsPathInvalid},
+		{"缺键", map[string]any{"orderNo": "A2026-001"}, hydrate.ErrRowsPathInvalid},
+		{"非数组", map[string]any{"order": map[string]any{"items": "not-an-array"}}, hydrate.ErrRowsPathInvalid},
 	}
 	for _, tc := range cases {
-		_, err := expand.NewExpander(nil).Expand(canvas.New(320, 400, templateTable()), tc.dataset)
+		_, err := hydrate.NewHydrator(nil).Hydrate(canvas.New(320, 400, templateTable()), tc.dataset)
 		if !errors.Is(err, tc.wantErr) {
 			t.Errorf("%s: 错误 = %v, want %v", tc.name, err, tc.wantErr)
 		}
@@ -327,8 +327,8 @@ func TestReservedRootKeyErrors(t *testing.T) {
 		"row 键": {"row": map[string]any{"name": "x"}},
 		"$ 前缀键": {"$meta": 1, "orderNo": "A"},
 	} {
-		_, err := expand.NewExpander(nil).Expand(canvas.New(320, 100, text), ds)
-		if !errors.Is(err, expand.ErrReservedRootKey) {
+		_, err := hydrate.NewHydrator(nil).Hydrate(canvas.New(320, 100, text), ds)
+		if !errors.Is(err, hydrate.ErrReservedRootKey) {
 			t.Errorf("%s: 错误 = %v, want ErrReservedRootKey", name, err)
 		}
 	}
@@ -337,8 +337,8 @@ func TestReservedRootKeyErrors(t *testing.T) {
 func TestEmptyResourceExpressionThrows(t *testing.T) {
 	// 资源类字段(Image src)求值空串 = 报错
 	ds := map[string]any{"order": map[string]any{"items": []any{map[string]any{"name": "张三"}}}}
-	_, err := expand.NewExpander(nil).Expand(canvas.New(320, 400, templateTable()), ds)
-	if !errors.Is(err, expand.ErrExpressionEmptyResource) {
+	_, err := hydrate.NewHydrator(nil).Hydrate(canvas.New(320, 400, templateTable()), ds)
+	if !errors.Is(err, hydrate.ErrExpressionEmptyResource) {
 		t.Errorf("错误 = %v, want ErrExpressionEmptyResource", err)
 	}
 }
@@ -355,8 +355,8 @@ func TestTypeMismatchInRowContextThrows(t *testing.T) {
 	table.SetTemplate(template)
 
 	ds := map[string]any{"items": []any{map[string]any{"tags": []any{"a", "b"}}}}
-	_, err := expand.NewExpander(nil).Expand(canvas.New(320, 400, table), ds)
-	if !errors.Is(err, expand.ErrExpressionTypeMismatch) {
+	_, err := hydrate.NewHydrator(nil).Hydrate(canvas.New(320, 400, table), ds)
+	if !errors.Is(err, hydrate.ErrExpressionTypeMismatch) {
 		t.Errorf("错误 = %v, want ErrExpressionTypeMismatch(数组落到标量位)", err)
 	}
 }
@@ -372,16 +372,16 @@ func (e *recordingEvaluator) Evaluate(template string, context map[string]any) (
 }
 
 func TestCustomEvaluatorInjection(t *testing.T) {
-	// 求值器为可注入策略(spec §3.6):替换默认实现后展开器走注入面
+	// 求值器为可注入策略(spec §3.6):替换默认实现后填充器走注入面
 	stub := &recordingEvaluator{result: "STUB"}
 	text := layer.NewTextLayer(layer.WithSize(100, 30), layer.WithFont("", 12, "#000"))
 	text.SetExpression("任意模板")
 
-	expanded, err := expand.NewExpander(stub).Expand(canvas.New(320, 100, text), map[string]any{"k": "v"})
+	hydrated, err := hydrate.NewHydrator(stub).Hydrate(canvas.New(320, 100, text), map[string]any{"k": "v"})
 	if err != nil {
-		t.Fatalf("Expand: %v", err)
+		t.Fatalf("Hydrate: %v", err)
 	}
-	if got := expanded.GetLayers()[0].(*layer.TextLayer).Text(); got != "STUB" {
+	if got := hydrated.GetLayers()[0].(*layer.TextLayer).Text(); got != "STUB" {
 		t.Errorf("注入求值结果 = %q, want STUB", got)
 	}
 	if len(stub.templates) != 1 || stub.templates[0] != "任意模板" {
@@ -414,11 +414,11 @@ func TestStructDatasetNormalization(t *testing.T) {
 	table.SetRowsPath("order.items")
 	table.SetTemplate(template)
 
-	expanded, err := expand.NewExpander(nil).Expand(canvas.New(320, 400, table), ds)
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(canvas.New(320, 400, table), ds)
 	if err != nil {
-		t.Fatalf("Expand: %v", err)
+		t.Fatalf("Hydrate: %v", err)
 	}
-	if got := firstTable(t, expanded).Rows()[0].Cells()[0].ContentLayer().(*layer.TextLayer).Text(); got != "张三" {
+	if got := firstTable(t, hydrated).Rows()[0].Cells()[0].ContentLayer().(*layer.TextLayer).Text(); got != "张三" {
 		t.Errorf("struct 数据集行文本 = %q, want 张三", got)
 	}
 }
@@ -426,7 +426,7 @@ func TestStructDatasetNormalization(t *testing.T) {
 func TestSentinelMessagesCarryCode(t *testing.T) {
 	// 稳定 code 是三端一致性抓手:消息以 code 前缀开头
 	ds := map[string]any{"order": map[string]any{"items": "not-an-array"}}
-	_, err := expand.NewExpander(nil).Expand(canvas.New(320, 400, templateTable()), ds)
+	_, err := hydrate.NewHydrator(nil).Hydrate(canvas.New(320, 400, templateTable()), ds)
 	if err == nil || !strings.HasPrefix(err.Error(), "rows_path_invalid") {
 		t.Errorf("错误消息 = %v, want rows_path_invalid 前缀", err)
 	}

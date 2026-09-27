@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/expand"
+	"github.com/hankchen/go-canvas/hydrate"
 	"github.com/hankchen/go-canvas/image-renderer"
 	"github.com/hankchen/go-canvas/image-renderer/typography"
 	"github.com/hankchen/go-canvas/layer"
@@ -62,13 +62,13 @@ func run(ctx context.Context, args []string, stdout io.Writer) error {
 		return err
 	}
 
-	// 标准管线(spec §0):渲染前独立展开步骤 + 渲染期惰性物化
-	expanded, err := expand.NewExpander(nil).Expand(c, dataset)
+	// 标准管线(spec §0):渲染前独立填充步骤 + 渲染期惰性物化
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(c, dataset)
 	if err != nil {
-		return fmt.Errorf("展开样图: %w", err)
+		return fmt.Errorf("填充样图: %w", err)
 	}
 
-	product, err := imagerenderer.NewRenderer(nil).Render(ctx, expanded)
+	product, err := imagerenderer.NewRenderer(nil).Render(ctx, hydrated)
 	if err != nil {
 		return fmt.Errorf("渲染样图: %w", err)
 	}
@@ -110,7 +110,7 @@ func pickFont(candidates []string) (string, error) {
 
 // buildSample 构造综合样图:内容复刻 PHP 版 visual-check(版式几何逐项一致,
 // 品牌字样与二维码内容按 go-canvas 改写,见 docs/visual-check.md 双端对照节)。
-// V2 段 = 声明态模板表(工票 12),经标准管线 Render(expand(canvas, dataset)) 出图
+// V2 段 = 声明态模板表(工票 12),经标准管线 Render(hydrate(canvas, dataset)) 出图
 func buildSample(font string) (*canvas.Canvas, map[string]any, error) {
 	// 白色底(最垫底),避免透明区域
 	bg := layer.NewImageLayer(
@@ -168,7 +168,7 @@ func buildSample(font string) (*canvas.Canvas, map[string]any, error) {
 		layer.WithPosition(0, 370), layer.WithPriority(4),
 	)
 
-	// V2 模板表(声明态,渲染前经 expand(dataset) 实例化)
+	// V2 模板表(声明态,渲染前经 hydrate(dataset) 实例化)
 	templateTable := buildTemplateTable(font)
 
 	bgV2 := layer.NewImageLayer(
@@ -178,12 +178,12 @@ func buildSample(font string) (*canvas.Canvas, map[string]any, error) {
 
 	return canvas.New(400, 460, bg, bgV2, header, title, paragraph, table, qrCode, strip, footer,
 		templateTable), map[string]any{
-		"items": []any{map[string]any{"name": "V2 模板行", "desc": "template × dataset → expand → render"}},
+		"items": []any{map[string]any{"name": "V2 模板行", "desc": "template × dataset → hydrate → render"}},
 	}, nil
 }
 
 // buildTemplateTable V2 模板表样例:单行循环体声明(格表达式 {{row.*}}),
-// 渲染前经 expand 实例化——目验面 = 行上下文求值与 V1 高度耦合重放
+// 渲染前经 hydrate 实例化——目验面 = 行上下文求值与 V1 高度耦合重放
 func buildTemplateTable(font string) *layer.TableLayer {
 	nameContent := layer.NewTextLayer(
 		layer.WithSize(120, 0), layer.WithAutoHeight(),
