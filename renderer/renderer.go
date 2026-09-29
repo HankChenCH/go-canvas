@@ -44,11 +44,25 @@ type template struct {
 	resolver *resolver.ResourceResolver
 }
 
-// New 以绘制原语组装渲染器。resolver 为 nil 时取默认物化器
+// defaultResolverSource 后端可选实现:自带默认物化器的后端经此暴露其接线。
+// 位图后端的二维码缝默认接线属 image-renderer module 的知识(ADR-0002 核心
+// 纯 stdlib,核心默认物化器 resolver.New() 无二维码实现)——New 以 nil
+// resolver 组装时优先采用后端自带物化器,后端未实现或返回 nil 回退核心默认
+type defaultResolverSource interface {
+	DefaultResolver() *resolver.ResourceResolver
+}
+
+// New 以绘制原语组装渲染器。resolver 为 nil 时取默认物化器:后端自带
+// (defaultResolverSource)优先,否则 resolver.New()
 // (对齐 PHP ImageRenderer 的 `$resolver ?? new ResourceResolver()`)
 func New(backend Backend, rs *resolver.ResourceResolver) Renderer {
 	if rs == nil {
-		rs = resolver.New()
+		if src, ok := backend.(defaultResolverSource); ok {
+			rs = src.DefaultResolver()
+		}
+		if rs == nil {
+			rs = resolver.New()
+		}
 	}
 	return &template{backend: backend, resolver: rs}
 }

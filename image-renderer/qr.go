@@ -11,7 +11,6 @@ import (
 	"image/color"
 	"io"
 
-	"github.com/hankchen/go-canvas/renderer"
 	"github.com/hankchen/go-canvas/resolver"
 
 	qr "github.com/yeqown/go-qrcode/v2"
@@ -144,11 +143,16 @@ func NewDefaultResolver(opts ...resolver.Option) *resolver.ResourceResolver {
 }
 
 // NewRenderer 组装位图渲染器(PHP new ImageRenderer() 的对应物):位图后端 +
-// 解析器。rs 为 nil 时取 NewDefaultResolver()(二维码缝已接线、缓存根为系统
-// 默认);传入自建解析器时按原样使用——自定义根须经 NewDefaultResolver 构造
-func NewRenderer(rs *resolver.ResourceResolver) renderer.Renderer {
+// 自带默认物化器。rs 为 nil 时取 NewDefaultResolver()(二维码缝已接线、缓存根
+// 为系统默认);传入自建解析器时按原样使用——自定义根须经 NewDefaultResolver
+// 构造。返回具体后端(实现 renderer.Backend),经 renderer.RenderAs/RenderLayerAs
+// 消费即完整渲染管线:核心 New 的 nil-resolver 组装路径自动发现自带物化器,
+// 泛型实参直接声明期望产物类型(工票13,ADR-0010)
+func NewRenderer(rs *resolver.ResourceResolver) *Renderer {
+	r := New()
 	if rs == nil {
 		rs = NewDefaultResolver()
 	}
-	return renderer.New(New(), rs)
+	r.defaultResolver = rs
+	return r
 }

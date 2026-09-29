@@ -144,8 +144,9 @@ func (c *countingQR) Materialize(ctx context.Context, text string, width int) ([
 	return c.inner.Materialize(ctx, text, width)
 }
 
-// newQrRenderer 组装带二维码默认接线的渲染器,缓存指向临时目录
-func newQrRenderer(t *testing.T, qr resolver.QRMaterializer) renderer.Renderer {
+// newQrRenderer 组装带二维码默认接线的渲染器,缓存指向临时目录。
+// 返回具体后端,经 renderer.RenderAs 消费(自带物化器被核心 New 自动发现)
+func newQrRenderer(t *testing.T, qr resolver.QRMaterializer) *Renderer {
 	t.Helper()
 	opts := []resolver.Option{resolver.WithCacheRoot(t.TempDir())}
 	if qr != nil {
@@ -157,11 +158,12 @@ func newQrRenderer(t *testing.T, qr resolver.QRMaterializer) renderer.Renderer {
 // renderQrLayerProduct 单图层便捷渲染,经 NewDefaultResolver 默认接线(带二维码)
 func renderQrLayerProduct(t *testing.T, l layer.Layer) *image.NRGBA {
 	t.Helper()
-	product, err := NewRenderer(NewDefaultResolver(resolver.WithCacheRoot(t.TempDir()))).RenderLayer(context.Background(), l)
+	img, err := renderer.RenderLayerAs[*image.NRGBA](
+		context.Background(), NewRenderer(NewDefaultResolver(resolver.WithCacheRoot(t.TempDir()))), l)
 	if err != nil {
-		t.Fatalf("RenderLayer: %v", err)
+		t.Fatalf("RenderLayerAs: %v", err)
 	}
-	return productAsImage(t, product)
+	return img
 }
 
 func TestQrRendersFinderPatternDarkAtCorner(t *testing.T) {
@@ -178,8 +180,9 @@ func TestQrLayerResolvesToCachedPNG(t *testing.T) {
 	l := layer.NewQrCodeLayer(layer.WithSize(60, 60), layer.WithQrText(qrSampleText))
 	c := canvas.New(60, 60, l)
 
-	if _, err := NewRenderer(NewDefaultResolver(resolver.WithCacheRoot(root))).Render(context.Background(), c); err != nil {
-		t.Fatalf("Render: %v", err)
+	if _, err := renderer.RenderAs[*image.NRGBA](
+		context.Background(), NewRenderer(NewDefaultResolver(resolver.WithCacheRoot(root))), c); err != nil {
+		t.Fatalf("RenderAs: %v", err)
 	}
 
 	if l.ResolvedSrc() == nil {
@@ -203,8 +206,8 @@ func TestIdenticalQrLayersMaterializeOnce(t *testing.T) {
 	c := canvas.New(60, 120, l1, l2)
 
 	r := newQrRenderer(t, counter)
-	if _, err := r.Render(context.Background(), c); err != nil {
-		t.Fatalf("Render: %v", err)
+	if _, err := renderer.RenderAs[*image.NRGBA](context.Background(), r, c); err != nil {
+		t.Fatalf("RenderAs: %v", err)
 	}
 
 	if counter.calls != 1 {
@@ -220,12 +223,13 @@ func TestIdenticalQrLayersMaterializeOnce(t *testing.T) {
 
 func TestNewRendererDefaultsToWiredQRMaterializer(t *testing.T) {
 	// NewRenderer(nil) = PHP new ImageRenderer() 对应物:二维码缝默认接线,
-	// 遇二维码图层不再报 ErrQRMaterializerRequired。缓存落系统用户缓存根
+	// 遇二维码图层不再报 ErrQRMaterializerRequired——自带物化器经核心 New 的
+	// nil-resolver 组装路径发现(RenderAs 即完整管线)。缓存落系统用户缓存根
 	// (默认根即设计行为,键确定性、幂等命中,与 PHP 测试共用真实缓存目录同处境)
 	l := layer.NewQrCodeLayer(layer.WithSize(60, 60), layer.WithQrText(qrSampleText))
 	c := canvas.New(60, 60, l)
 
-	if _, err := NewRenderer(nil).Render(context.Background(), c); err != nil {
+	if _, err := renderer.RenderAs[*image.NRGBA](context.Background(), NewRenderer(nil), c); err != nil {
 		t.Fatalf("默认接线渲染二维码图层: %v", err)
 	}
 	if l.ResolvedSrc() == nil {

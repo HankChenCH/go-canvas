@@ -25,6 +25,7 @@ import (
 	"github.com/hankchen/go-canvas/image-renderer"
 	"github.com/hankchen/go-canvas/image-renderer/typography"
 	"github.com/hankchen/go-canvas/layer"
+	"github.com/hankchen/go-canvas/renderer"
 )
 
 // fontCandidates 字体候选:优先带 CJK 字形的字体,避免中文变豆腐块;
@@ -68,13 +69,9 @@ func run(ctx context.Context, args []string, stdout io.Writer) error {
 		return fmt.Errorf("填充样图: %w", err)
 	}
 
-	product, err := imagerenderer.NewRenderer(nil).Render(ctx, hydrated)
+	img, err := renderer.RenderAs[*image.NRGBA](ctx, imagerenderer.NewRenderer(nil), hydrated)
 	if err != nil {
 		return fmt.Errorf("渲染样图: %w", err)
-	}
-	img, ok := product.(*image.NRGBA)
-	if !ok {
-		return fmt.Errorf("渲染产物类型异常: %T", product)
 	}
 	if err := imagerenderer.SavePNG(output, img); err != nil {
 		return err

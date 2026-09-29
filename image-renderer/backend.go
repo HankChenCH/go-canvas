@@ -15,6 +15,7 @@ import (
 
 	"github.com/hankchen/go-canvas/layer"
 	"github.com/hankchen/go-canvas/renderer"
+	"github.com/hankchen/go-canvas/resolver"
 	"golang.org/x/image/font"
 )
 
@@ -25,12 +26,20 @@ import (
 type Renderer struct {
 	surface *image.NRGBA
 	faces   map[fontKey]font.Face
+
+	// defaultResolver 后端自带的默认物化器(NewRenderer 接线,可为 nil);
+	// 核心 New 以 nil resolver 组装时经 DefaultResolver 发现并优先采用
+	defaultResolver *resolver.ResourceResolver
 }
 
 var _ renderer.Backend = (*Renderer)(nil)
 
 // New 构造位图渲染后端
 func New() *Renderer { return &Renderer{} }
+
+// DefaultResolver 后端自带的默认物化器(核心渲染模板 nil-resolver 组装路径
+// 的可选发现面);未经 NewRenderer 接线时返回 nil,核心回退自身默认
+func (r *Renderer) DefaultResolver() *resolver.ResourceResolver { return r.defaultResolver }
 
 // face 取渲染面;未建面即调用绘制原语属用法错误(模板保证先 Begin)
 func (r *Renderer) face() (*image.NRGBA, error) {
