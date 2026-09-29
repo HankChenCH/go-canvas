@@ -78,12 +78,17 @@ func (r *template) RenderLayer(ctx context.Context, l layer.Layer) (any, error) 
 	return r.renderSurface(ctx, p.Width(), p.Height(), []layer.Layer{l})
 }
 
-// renderSurface 建面 → 逐层 paint → 收尾;任一原语/物化报错即中止(渲染面丢弃)
+// renderSurface 建面 → 逐层 paint → 收尾;任一原语/物化报错即中止(渲染面丢弃)。
+// 根层循环每图层前设控制面检查点(与 php render 根层循环同位,工票 03):
+// ctx 到期/取消报渲染 code,先于下一层的绘制分派与惰性物化
 func (r *template) renderSurface(ctx context.Context, width, height int, layers []layer.Layer) (any, error) {
 	if err := r.backend.Begin(width, height); err != nil {
 		return nil, err
 	}
 	for _, l := range layers {
+		if err := resolver.CheckContext(ctx); err != nil {
+			return nil, err
+		}
 		if err := r.paint(ctx, l, 0, 0, width, height); err != nil {
 			return nil, err
 		}
@@ -125,7 +130,9 @@ func (r *template) paint(ctx context.Context, l layer.Layer, originX, originY, p
 }
 
 // paintTable 表容器:先画自身盒,再按行高累加纵向排布各行
-// (行锚点相对表盒解析;全部直画同一渲染面,坐标经参数传递)
+// (行锚点相对表盒解析;全部直画同一渲染面,坐标经参数传递)。
+// 行循环每行前设控制面检查点(与 php paintTable 同位,工票 03)——大表是
+// 真实长杆,行间逐行掐断
 func (r *template) paintTable(ctx context.Context, l *layer.TableLayer, x, y int) error {
 	if err := r.backend.DrawRect(x, y, l.Width(), l.Height(), l.Background(), l.Border()); err != nil {
 		return err
@@ -133,6 +140,9 @@ func (r *template) paintTable(ctx context.Context, l *layer.TableLayer, x, y int
 
 	posy := y
 	for _, row := range l.Rows() {
+		if err := resolver.CheckContext(ctx); err != nil {
+			return err
+		}
 		if err := r.paint(ctx, row, x, posy, l.Width(), l.Height()); err != nil {
 			return err
 		}

@@ -25,7 +25,8 @@ import (
 
 // 绘制期错误稳定 code(spec §5.2,三端一致性抓手:消息可本地化,code 稳定;
 // PHP 侧对位 MaterializeException.getErrorCode,errors.Is 判定,消息形态
-// 「code + 上下文」与 PHP 一致,双端日志可互查)
+// 「code + 上下文」与 PHP 一致,双端日志可互查;渲染控制面两 code 的语义权威
+// 单列为 Runtime\CancellationSource/TimeoutCancellation,见各自条目)
 var (
 	// ErrResourceDownloadFailed 远程资源下载失败/空响应
 	ErrResourceDownloadFailed = errors.New("resource_download_failed")
@@ -33,7 +34,44 @@ var (
 	ErrResourceSaveFailed = errors.New("resource_save_failed")
 	// ErrQRGenerateFailed QR 生成/落盘失败
 	ErrQRGenerateFailed = errors.New("qr_generate_failed")
+	// ErrRenderDeadlineExceeded 渲染截止时间已到(渲染期控制面,ADR 0008;
+	// code 语义权威 = php Runtime\TimeoutCancellation,工票 render-cancellation 02)
+	ErrRenderDeadlineExceeded = errors.New("render_deadline_exceeded")
+	// ErrRenderCancelled 人为取消(渲染期控制面,ADR 0008;
+	// code 语义权威 = php Runtime\CancellationSource,工票 render-cancellation 02)
+	ErrRenderCancelled = errors.New("render_cancelled")
 )
+
+// ctxAttribution 渲染期 ctx 归因(工票 render-cancellation 03):错误链命中
+// context.DeadlineExceeded / context.Canceled 之一即映射为对应渲染 code 哨兵
+// (spec §5.2 三端锚点),原错误经 %w 保留在链上——errors.Is 对 context 两错误
+// 与渲染两 code 同时成立;未命中返回 nil
+func ctxAttribution(err error) error {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		return fmt.Errorf("%w: render deadline exceeded: %w", ErrRenderDeadlineExceeded, err)
+	case errors.Is(err, context.Canceled):
+		return fmt.Errorf("%w: rendering cancelled: %w", ErrRenderCancelled, err)
+	default:
+		return nil
+	}
+}
+
+// CheckContext 渲染期控制面检查点(ADR 0008):ctx 已到期/取消即报渲染 code。
+// 渲染器模板在根层循环每图层前、表行循环每行前调用(与 php 四检查点同位,
+// 工票 03);下载发起前不再单设检查点——ctx 已随 NewRequestWithContext 穿线,
+// 到期/取消由 net/http 免费打断并经下载错误归因映射回渲染 code
+func CheckContext(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		// ctx.Err() 按契约只返回 nil/DeadlineExceeded/Canceled,恒命中归因;
+		// 异类实现原样上冒,不吞错
+		if mapped := ctxAttribution(err); mapped != nil {
+			return mapped
+		}
+		return err
+	}
+	return nil
+}
 
 // ErrQRMaterializerRequired 二维码物化缝未接线(ADR-0002):核心只定义接口,
 // 固定选项实现在 M2 渲染后端 module,组装时经 WithQRMaterializer 注入。
@@ -96,8 +134,13 @@ func (r *ResourceResolver) Resolve(ctx context.Context, c *canvas.Canvas) error 
 }
 
 // ResolveLayer 物化单图层;容器递归下钻 表→行→单元格→内容层。
+// 入口检查点(与 php resolveLayer 入口同位,工票 03):物化前掐断已取消/到期的
+// ctx,渲染器惰性调用与全画布预遍历 API 两路径同覆盖。
 // 未知/外部图层类型静默跳过(对齐 PHP match default 臂)
 func (r *ResourceResolver) ResolveLayer(ctx context.Context, l layer.Layer) error {
+	if err := CheckContext(ctx); err != nil {
+		return err
+	}
 	switch t := l.(type) {
 	case *layer.TableLayer:
 		for _, row := range t.Rows() {
@@ -203,6 +246,12 @@ func (r *ResourceResolver) cachedRemoteFile(ctx context.Context, sub, rawURL str
 
 	content, err := r.downloader.Download(ctx, rawURL)
 	if err != nil {
+		// ctx 归因优先(工票 03):下载被打断于 ctx 到期/取消时报渲染 code
+		// 而非资源 code——同一失败两种归因,渲染 code 是三端锚点;下载自身的
+		// 流超时仍归 resource_download_failed(spec §5.2,不另立 code)
+		if mapped := ctxAttribution(err); mapped != nil {
+			return "", mapped
+		}
 		// 双 %w:哨兵供 errors.Is 判定,底层错误(取消/超时等)不丢失
 		return "", fmt.Errorf("%w: could not get remote file(%s): %w", ErrResourceDownloadFailed, rawURL, err)
 	}
