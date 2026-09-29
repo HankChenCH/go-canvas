@@ -15,7 +15,7 @@ else
 endif
 endif
 
-.PHONY: test vet layout-snapshot hydrate-fixtures paginate-fixtures visual-check
+.PHONY: test vet layout-snapshot hydrate-fixtures paginate-fixtures flow-fixtures visual-check
 
 test:
 	go test ./...
@@ -41,6 +41,13 @@ hydrate-fixtures:
 # 何时需要重导见 fixture meta.notes
 paginate-fixtures:
 	$(PHP) ../php-canvas-next/scripts/export-paginate-fixtures.php paginate/testdata
+	@echo "fixture 已更新:人审 git diff(diff 即双端语义行为 diff)后随代码一并提交"
+
+# flow 段共享 fixture 再生成(spec §10.5,工票 11):flow-semantics.json 二十规定用例
+# 与 paginate-semantics.json 同目录提交进本仓库,Go 侧 flow 镜像 runner 另 effort;
+# PHP 侧为语义权威,何时需要重导见 fixture meta.notes
+flow-fixtures:
+	$(PHP) ../php-canvas-next/scripts/export-flow-fixtures.php paginate/testdata
 	@echo "fixture 已更新:人审 git diff(diff 即双端语义行为 diff)后随代码一并提交"
 
 # 目验脚本:渲染综合样图供人工目验(工单 11,用法与目验要点见 docs/visual-check.md);
