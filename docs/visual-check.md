@@ -10,13 +10,13 @@ make visual-check                 # 产物缺省 image-renderer/visual-check.png
 make visual-check OUTPUT=out.png  # 或直接: cd image-renderer && go run ./cmd/visualcheck out.png
 ```
 
-成功即打印产物路径与尺寸（`已输出: … (400x400)`）；缺字体、资源物化失败等以明确报错中止，不产残图。
+成功即打印产物路径与尺寸（`已输出: … (400x520)`）；缺字体、资源物化失败等以明确报错中止，不产残图。
 
 脚本本体 `image-renderer/cmd/visualcheck/main.go`，含同包冒烟测试（结构断言 + 渲染无 panic + 产物 PNG 合法）。
 
 ## 样图内容与目验要点
 
-400×400 画布，逐项对应一条验收线：
+400×520 画布，逐项对应一条验收线：
 
 | 样图元素 | 目验要点 |
 | --- | --- |
@@ -27,6 +27,8 @@ make visual-check OUTPUT=out.png  # 或直接: cd image-renderer && go run ./cmd
 | 二维码（90×90） | 扫码可得 `https://github.com/hankchen/go-canvas`；按宽正方形铺放 |
 | 条带图（本地生成双色 PNG） | 图片图层 cover 铺放：#e8f0e8 底 + #6dc287 色块，无拉伸变形 |
 | 页脚（居中灰字） | 小字号文本垂直居中 |
+| 宽自适应单行文本（#fff7e6 底 + #e6a23c 边框，ADR 0014） | 盒宽 = 自然宽 + 横向 padding：背景/边框随内容收紧贴合，而非塌缩为 0 |
+| 宽自适应 + autowrap 多行文本（#f0f9eb 底 + #67c23a 边框） | 组合退化为不折行：显式换行两行，盒宽取最长段 |
 
 ## 字体
 

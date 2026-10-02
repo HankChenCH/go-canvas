@@ -4,11 +4,14 @@ package layer_test
 // 来自 phpunit 断言。适配项:
 //   - PHP setter 链改为 functional options(DESIGN.md「有意偏离」#4);
 //   - 度量工厂注入用例为工单 02 新增(锁定工厂注入语义);
-//   - TextOrigin 用例锁定 ADR-0003 有意偏离(PHP 的 GD 基线魔数不移植)。
+//   - TextOrigin 用例锁定 ADR-0003 有意偏离(PHP 的 GD 基线魔数不移植);
+//   - 宽自适应(autoWidth)用例为 autowidth-content-injection 工单 02 新增,
+//     期望值逐值镜像 PHP 权威端(ADR 0014)。
 
 import (
 	"encoding/json"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/hankchen/go-canvas/layer"
 	"github.com/hankchen/go-canvas/text"
@@ -25,6 +28,11 @@ func (fakeBreaker) BreakText(string, float64, text.TextMeasurer) []string {
 type fixedMeasurer float64
 
 func (m fixedMeasurer) Measure(string) float64 { return float64(m) }
+
+// runeCountMeasurer 度量假实现:按字符数 × 100 量宽(PHP 匿名类 mb_strlen 同款)
+type runeCountMeasurer struct{}
+
+func (runeCountMeasurer) Measure(s string) float64 { return float64(utf8.RuneCountInString(s)) * 100 }
 
 func TestTextFixedHeightReturnsDeclaredHeight(t *testing.T) {
 	// PHP TextLayerTest::testFixedHeightReturnsDeclaredHeight
@@ -225,5 +233,170 @@ func TestTextDefaultVerticalAlignBottom(t *testing.T) {
 
 	if l.HorizontalAlign() != layer.AlignLeft || l.VerticalAlign() != layer.AlignBottom {
 		t.Errorf("文本图层默认对齐 = (%s, %s), want (left, bottom)", l.HorizontalAlign(), l.VerticalAlign())
+	}
+}
+
+// ---- 宽自适应(工单 02,ADR 0014):期望值逐值镜像 PHP TextLayerTest ----
+
+func TestTextAutoWidthSingleLineNaturalWidth(t *testing.T) {
+	// PHP TextLayerTest::testAutoWidthSingleLineNaturalWidth:
+	// 启发式度量:半角 0.55 字宽 × 字号 → 'abcd' @10 = 4 × 5.5 = 22
+	l := layer.NewTextLayer(layer.WithSize(0, 20), layer.WithAutoWidth(),
+		layer.WithText("abcd"), layer.WithFont("", 10, "#000"))
+
+	if got := l.Width(); got != 22 {
+		t.Errorf("Width() = %d, want 22", got)
+	}
+}
+
+func TestTextAutoWidthTakesMaxSegmentAcrossExplicitNewlines(t *testing.T) {
+	// PHP TextLayerTest::testAutoWidthTakesMaxSegmentAcrossExplicitNewlines:
+	// 显式换行拆段取最大段宽:'ab' @10 = 11,'一二三' @10 = 30 → 30
+	l := layer.NewTextLayer(layer.WithAutoWidth(), layer.WithAutoHeight(),
+		layer.WithText("ab\n一二三"), layer.WithFont("", 10, "#000"))
+
+	if got := l.Width(); got != 30 {
+		t.Errorf("Width() = %d, want 30", got)
+	}
+}
+
+func TestTextAutoWidthEmptyTextKeepsHorizontalPaddingOnly(t *testing.T) {
+	// PHP TextLayerTest::testAutoWidthEmptyTextKeepsHorizontalPaddingOnly:
+	// 空文本 = 0 + 横向 padding(镜像 autoHeight 空文本只剩纵向 padding)
+	l := layer.NewTextLayer(layer.WithAutoWidth(), layer.WithAutoHeight(),
+		layer.WithPadding(10))
+
+	if got := l.Width(); got != 20 {
+		t.Errorf("Width() = %d, want 20(仅 padding)", got)
+	}
+}
+
+func TestTextAutoWidthCeilsFractionalMeasure(t *testing.T) {
+	// PHP TextLayerTest::testAutoWidthCeilsFractionalMeasure:
+	// 浮点段宽 ceil:'abc' @10 = 3 × 0.55 × 10 = 16.5 → 17
+	l := layer.NewTextLayer(layer.WithAutoWidth(), layer.WithAutoHeight(),
+		layer.WithText("abc"), layer.WithFont("", 10, "#000"))
+
+	if got := l.Width(); got != 17 {
+		t.Errorf("Width() = %d, want 17", got)
+	}
+}
+
+func TestTextAutoWidthWithAutowrapDegradesToNoWrap(t *testing.T) {
+	// PHP TextLayerTest::testAutoWidthWithAutowrapDegradesToNoWrap:
+	// autoWidth 优先:内容盒宽即自然宽(70)→ 断行不再切分,组合退化为不折行;
+	// autowrap 标志留在结构不动
+	l := layer.NewTextLayer(layer.WithAutoWidth(), layer.WithAutoHeight(),
+		layer.WithText("一二三四五六七"), layer.WithFont("", 10, "#000"),
+		layer.WithAutowrap(true))
+
+	if got := l.Width(); got != 70 {
+		t.Errorf("Width() = %d, want 70", got)
+	}
+	if got := l.ContentWidth(); got != 70 {
+		t.Errorf("ContentWidth() = %d, want 70(内容盒宽即自然宽)", got)
+	}
+	lines := l.Lines()
+	if len(lines) != 1 || lines[0] != "一二三四五六七" {
+		t.Errorf("Lines() = %q, want [一二三四五六七]", lines)
+	}
+	if !l.Autowrap() {
+		t.Error("Autowrap() = false, want true(标志留在结构不动)")
+	}
+	if !l.Graph().Spec.Shape.AutoWidth {
+		t.Error("graph autoWidth 标志必须为 true")
+	}
+}
+
+func TestTextAutoWidthWithAutowrapKeepsExplicitNewlines(t *testing.T) {
+	// PHP TextLayerTest::testAutoWidthWithAutowrapKeepsExplicitNewlines:
+	// 三组合(autoWidth + autowrap + 显式换行):宽度取最大段宽(80),
+	// 断行只落在显式换行处、段内不再折行
+	l := layer.NewTextLayer(layer.WithAutoWidth(), layer.WithAutoHeight(),
+		layer.WithText("一二三四五六七\n一二三四五六七八"),
+		layer.WithFont("", 10, "#000"), layer.WithAutowrap(true))
+
+	if got := l.Width(); got != 80 {
+		t.Errorf("Width() = %d, want 80", got)
+	}
+	lines := l.Lines()
+	if len(lines) != 2 || lines[0] != "一二三四五六七" || lines[1] != "一二三四五六七八" {
+		t.Errorf("Lines() = %q, want [一二三四五六七 一二三四五六七八]", lines)
+	}
+}
+
+func TestTextAutoWidthPaddingTruncatesSumTowardZero(t *testing.T) {
+	// PHP TextLayerTest::testAutoWidthPaddingTruncatesSumTowardZero:
+	// 横向 padding trunc 求和(镜像 autoHeight 的 intval 纵向和):
+	// 2.7 + 2.7 = 5.4 → 5;'一二' @10 = 20 → 25
+	l := layer.NewTextLayer(layer.WithAutoWidth(), layer.WithAutoHeight(),
+		layer.WithText("一二"), layer.WithFont("", 10, "#000"),
+		layer.WithPaddingVH(1.2, 2.7))
+
+	if got := l.Width(); got != 25 {
+		t.Errorf("Width() = %d, want 25", got)
+	}
+}
+
+func TestTextAutoWidthNegativePaddingTruncatesTowardZero(t *testing.T) {
+	// PHP TextLayerTest::testAutoWidthNegativePaddingTruncatesTowardZero:
+	// 负值沿 normZero 惯例(整数域无 -0,向零截断):-5 + -5 = -10;
+	// '一二' @10 = 20 → 10
+	l := layer.NewTextLayer(layer.WithAutoWidth(), layer.WithAutoHeight(),
+		layer.WithText("一二"), layer.WithFont("", 10, "#000"),
+		layer.WithPaddingVH(0, -5))
+
+	if got := l.Width(); got != 10 {
+		t.Errorf("Width() = %d, want 10", got)
+	}
+}
+
+func TestTextAutoWidthGoesThroughMeasurerSeam(t *testing.T) {
+	// PHP TextLayerTest::testAutoWidthGoesThroughMeasurerSeam:
+	// 宽度求值经层内既有度量缝:注入增强度量器即得增强自然宽
+	l := layer.NewTextLayer(layer.WithAutoWidth(), layer.WithAutoHeight(),
+		layer.WithText("ab"),
+		layer.WithMeasurerFactory(func(string, float64) text.TextMeasurer {
+			return runeCountMeasurer{}
+		}))
+
+	if got := l.Width(); got != 200 {
+		t.Errorf("Width() = %d, want 200", got)
+	}
+}
+
+func TestTextAutoWidthGraphRoundtripByteFaceUnchanged(t *testing.T) {
+	// PHP TextLayerTest::testAutoWidthGraphRoundtripByteFaceUnchanged:
+	// wire 字节面零改动:autoWidth flag 照旧无条件写键、width 照旧落 0,往返恒等
+	l := layer.NewTextLayer(layer.WithSize(0, 20), layer.WithAutoWidth(),
+		layer.WithText("内容"), layer.WithFont("", 14, "#000"))
+
+	graph := l.Graph()
+	if got := graph.Spec.Shape.Width; got != 0 {
+		t.Errorf("graph width = %d, want 0", got)
+	}
+	if !graph.Spec.Shape.AutoWidth {
+		t.Error("graph autoWidth 标志必须为 true")
+	}
+
+	var node layer.Node
+	if err := json.Unmarshal([]byte(jsonOf(t, graph)), &node); err != nil {
+		t.Fatalf("解码 graph 节点: %v", err)
+	}
+	rebuilt, err := layer.FromGraph(node)
+	if err != nil {
+		t.Fatalf("FromGraph: %v", err)
+	}
+	if got, want := jsonOf(t, rebuilt.Graph()), jsonOf(t, graph); got != want {
+		t.Errorf("往返 graph 不恒等:\n got  %s\n want %s", got, want)
+	}
+}
+
+func TestTextFixedWidthUnaffectedByAutoWidthEval(t *testing.T) {
+	// 固定宽不受扰:未开 autoWidth 时 Width() 返回声明值,不求值自然宽
+	l := layer.NewTextLayer(layer.WithSize(100, 40), layer.WithText("一二三四五六七"))
+
+	if got := l.Width(); got != 100 {
+		t.Errorf("Width() = %d, want 100(声明宽)", got)
 	}
 }

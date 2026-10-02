@@ -39,6 +39,22 @@ func TestAddRowSyncsRowWidthToTableWidth(t *testing.T) {
 	}
 }
 
+func TestAutoWidthContentLayerWidthForceSynced(t *testing.T) {
+	// 工单 02 回归:表格「宽同步 + 强关 autoWidth」耦合不受 TextLayer 宽度求值扰动
+	// ——格内容层即使带 autoWidth 构造,包装时宽同步为格宽且标志被清除,
+	// 求值不进入表格耦合(PHP TableLayer 强关同款)
+	cell := layer.NewTableCellLayer(layer.WithSize(160, 40))
+	content := layer.NewTextLayer(layer.WithAutoWidth(), layer.WithText("自动宽内容"))
+	cell.AddContentLayer(content)
+
+	if got := content.Width(); got != 160 {
+		t.Errorf("内容层宽 = %d, want 160(同步格宽)", got)
+	}
+	if content.Graph().Spec.Shape.AutoWidth {
+		t.Error("内容层 autoWidth 标志必须被强关")
+	}
+}
+
 func TestIsOverHeightTracksAccumulatedRowHeights(t *testing.T) {
 	// PHP TableLayersTest::testIsOverHeightTracksAccumulatedRowHeights:按累计行高判定
 	table := layer.NewTableLayer(layer.WithSize(200, 25))

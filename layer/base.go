@@ -127,12 +127,19 @@ func (b *base) Height() int { return b.height }
 
 // ContentWidth 内容区宽度 = 宽度 - 左右 padding(向零截断,对齐 PHP intval)
 func (b *base) ContentWidth() int {
-	return int(float64(b.width) - b.padding.Left - b.padding.Right)
+	return contentWidthOf(b.width, b.padding)
 }
 
 // ContentHeight 内容区高度 = 高度 - 上下 padding
 func (b *base) ContentHeight() int {
 	return contentHeightOf(b.height, b.padding)
+}
+
+// contentWidthOf 任意动态宽 - 左右 padding(向零截断,对齐 PHP intval)。
+// Width() 被覆写的图层(Text)经它派生 ContentWidth,恢复 PHP getContentWidth
+// 经 $this->getWidth() 的动态分派语义
+func contentWidthOf(width int, padding Padding) int {
+	return int(float64(width) - padding.Left - padding.Right)
 }
 
 // contentHeightOf 任意动态高 - 上下 padding(向零截断,对齐 PHP intval)。

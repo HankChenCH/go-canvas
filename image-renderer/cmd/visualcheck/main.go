@@ -1,6 +1,7 @@
 // 目验脚本:一条命令渲染综合样图(中文禁则段落、表格嵌套单元格、二维码、
-// 色块与边框、priority 叠加)供人工目验,对应 php-canvas-image-renderer 的
-// scripts/visual-check.php——像素取样/布局快照之外的人眼验收面。
+// 色块与边框、priority 叠加、宽自适应文本盒)供人工目验,对应
+// php-canvas-image-renderer 的 scripts/visual-check.php——像素取样/布局快照
+// 之外的人眼验收面。
 //
 // priority 语义与 PHP 一致:priority 越大越先渲染(视觉上越垫底)。
 //
@@ -165,16 +166,35 @@ func buildSample(font string) (*canvas.Canvas, map[string]any, error) {
 		layer.WithPosition(0, 370), layer.WithPriority(4),
 	)
 
+	// 宽自适应文本层(ADR 0014,对齐 PHP 版样图):盒宽 = 未断行自然宽 + 横向 padding,
+	// 背景/边框随自然宽生效——盒宽贴合内容即目验通过(缺省启发式度量)
+	autoWidthSingle := layer.NewTextLayer(
+		layer.WithAutoWidth(), layer.WithAutoHeight(), layer.WithBackground("#fff7e6"),
+		layer.WithText("自动宽度贴合内容"),
+		layer.WithFont(font, 16, "#333333"),
+		layer.WithPadding(8), layer.WithBorder(1, "#e6a23c"),
+		layer.WithPosition(20, 465), layer.WithPriority(4),
+	)
+
+	// autoWidth + autowrap 组合退化为不折行:显式换行拆段取最大段宽
+	autoWidthMultiline := layer.NewTextLayer(
+		layer.WithAutoWidth(), layer.WithAutoHeight(), layer.WithBackground("#f0f9eb"),
+		layer.WithText("第一段\n显式换行后的更长一段"),
+		layer.WithFont(font, 14, "#333333"),
+		layer.WithPadding(8), layer.WithBorder(1, "#67c23a"), layer.WithAutowrap(true),
+		layer.WithPosition(220, 465), layer.WithPriority(4),
+	)
+
 	// V2 模板表(声明态,渲染前经 hydrate(dataset) 实例化)
 	templateTable := buildTemplateTable(font)
 
 	bgV2 := layer.NewImageLayer(
-		layer.WithSize(400, 60), layer.WithBackground("#ffffff"),
+		layer.WithSize(400, 120), layer.WithBackground("#ffffff"),
 		layer.WithPosition(0, 400), layer.WithPriority(11),
 	)
 
-	return canvas.New(400, 460, bg, bgV2, header, title, paragraph, table, qrCode, strip, footer,
-		templateTable), map[string]any{
+	return canvas.New(400, 520, bg, bgV2, header, title, paragraph, table, qrCode, strip, footer,
+		templateTable, autoWidthSingle, autoWidthMultiline), map[string]any{
 		"items": []any{map[string]any{"name": "V2 模板行", "desc": "template × dataset → hydrate → render"}},
 	}, nil
 }

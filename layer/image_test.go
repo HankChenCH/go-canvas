@@ -19,6 +19,18 @@ func TestSetImageStoresRawValueOnly(t *testing.T) {
 	}
 }
 
+func TestImageAutoWidthStaysDeclaredZero(t *testing.T) {
+	// PHP ImageLayerTest(工单 02):autoWidth 仅 TextLayer 有义——Image 自然尺寸需
+	// 物化资源才可知(ADR 0005 物化红线,物化不前移到布局期),宽度求值不覆盖,
+	// flag 维持无义
+	l := layer.NewImageLayer(layer.WithSize(0, 40), layer.WithAutoWidth(),
+		layer.WithImage("https://example.com/a.png"))
+
+	if got := l.Width(); got != 0 {
+		t.Errorf("Width = %d, want 0(声明宽,无求值)", got)
+	}
+}
+
 func TestEmptyImageValueIsIgnored(t *testing.T) {
 	// PHP ImageLayerTest::testEmptyImageValueIsIgnored:空串归 null
 	l := layer.NewImageLayer(layer.WithSize(100, 100), layer.WithImage(""))

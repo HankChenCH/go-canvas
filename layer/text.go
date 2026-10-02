@@ -2,6 +2,7 @@ package layer
 
 import (
 	"math"
+	"strings"
 
 	"github.com/hankchen/go-canvas/text"
 )
@@ -95,6 +96,28 @@ func (l *TextLayer) ResolvedFont() string {
 	return l.font
 }
 
+// Width 宽度(覆写基类,ADR 0014):autoWidth 时 = 未断行自然宽——按显式换行拆段
+// 取最大度量宽(ceil)+ 横向 padding(向零截断求和,镜像 Height() 纵向 padding);
+// 空文本 = 0 + 横向 padding(空串拆段得 [""],度量宽 0 自然落到该分支)。求值忽略
+// autowrap——内容盒宽即自然宽,断行不再切分(除显式换行),组合退化为不折行,
+// autowrap 标志留在结构不动;拆段只按 \n 硬拆、不经 LineBreaker 缝(断行策略属
+// autowrap 渲染路径)。度量经层内度量缝(缺省启发式,可注入增强),字体值口径同
+// Lines()(工单 09),布局不触发物化
+func (l *TextLayer) Width() int {
+	if !l.autoWidth {
+		return l.width
+	}
+
+	measurer := l.measurerFactory(l.ResolvedFont(), float64(l.fontSize))
+
+	natural := 0.0
+	for _, segment := range strings.Split(l.text, "\n") {
+		natural = math.Max(natural, measurer.Measure(segment))
+	}
+
+	return int(math.Ceil(natural)) + int(l.padding.Left+l.padding.Right)
+}
+
 // Height 文本高度(覆写基类):auto 时 = 行数×行高像素 + padding 高
 // (非 autowrap 无文本时仅 padding);否则返回声明高度
 func (l *TextLayer) Height() int {
@@ -141,6 +164,14 @@ func (l *TextLayer) LineHeightPx() int {
 // (工单10 布局快照 fixture 抓出的移植偏差)
 func (l *TextLayer) ContentHeight() int {
 	return contentHeightOf(l.Height(), l.padding)
+}
+
+// ContentWidth 内容区宽度 = 动态宽 - 左右 padding。覆写:Width() 有 auto 语义
+// (自然宽,ADR 0014),须按多态结果计算——对齐 PHP getContentWidth 经
+// $this->getWidth() 动态分派;autoWidth + autowrap 组合的内容盒宽即自然宽,
+// 断行不再折行(基类版读原始字段,autoWidth 层会得到 0-padding 的负盒)
+func (l *TextLayer) ContentWidth() int {
+	return contentWidthOf(l.Width(), l.padding)
 }
 
 // TextOrigin 文本在内容盒内的绘制基准点(对齐 + 行数),纯布局计算,渲染端共用。

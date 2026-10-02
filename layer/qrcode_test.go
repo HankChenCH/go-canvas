@@ -19,6 +19,23 @@ func TestQrCodeDeclaredHeightWinsWhenNotAuto(t *testing.T) {
 	}
 }
 
+func TestQrCodeAutoWidthStaysDeclaredZero(t *testing.T) {
+	// PHP QrCodeLayerTest(工单 02):autoWidth 仅 TextLayer 有义——QrCode 无自然宽
+	// 概念(任意尺寸合法),宽度求值不覆盖、按宽兜底正方形取的仍是声明宽,flag 维持无义
+	l := layer.NewQrCodeLayer(layer.WithAutoWidth(), layer.WithAutoHeight(),
+		layer.WithQrText("https://example.com"))
+
+	if got := l.Width(); got != 0 {
+		t.Errorf("Width = %d, want 0(声明宽,无求值)", got)
+	}
+	if got := l.Height(); got != 0 {
+		t.Errorf("Height = %d, want 0(按宽兜底取的仍是声明宽)", got)
+	}
+	if !l.Graph().Spec.Shape.AutoWidth {
+		t.Error("graph autoWidth 标志必须为 true")
+	}
+}
+
 func TestQrCodeHeightFallsBackToWidth(t *testing.T) {
 	// PHP QrCodeLayerTest::testHeightFallsBackToWidth:auto 高度按宽度兜底(正方形铺放)。
 	// 适配补充:声明高度 0(非 auto)同样按宽兜底,避免 0 高盒子

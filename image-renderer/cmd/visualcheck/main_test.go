@@ -88,12 +88,12 @@ func TestBuildSampleArrangesContent(t *testing.T) {
 		t.Fatalf("buildSample: %v", err)
 	}
 
-	if c.Width() != 400 || c.Height() != 460 { // V2 模板表样例区加高(工票 12)
-		t.Fatalf("画布 = %dx%d, want 400x460(V2 模板表样例区加高,工票 12)", c.Width(), c.Height())
+	if c.Width() != 400 || c.Height() != 520 { // V2 模板表样例区加高(工票 12)+ autoWidth 样例区(工单 02)
+		t.Fatalf("画布 = %dx%d, want 400x520(V2 模板表 + autoWidth 样例区)", c.Width(), c.Height())
 	}
 
-	// priority 叠加:降序 [白底 11, 头图 10, 标题 5, 段落/表格/二维码/条带/页脚 4…],
-	// 等优先级保持插入序
+	// priority 叠加:降序 [白底 11, 头图 10, 标题 5, 段落/表格/二维码/条带/页脚
+	// /autoWidth 样例 4…],等优先级保持插入序
 	layers := c.GetLayers()
 	gotTypes := make([]string, 0, len(layers))
 	gotPriorities := make([]int, 0, len(layers))
@@ -101,13 +101,14 @@ func TestBuildSampleArrangesContent(t *testing.T) {
 		gotTypes = append(gotTypes, l.TypeName())
 		gotPriorities = append(gotPriorities, l.Priority())
 	}
-	// V2 段(工票 12):bgV2 垫底 ImageLayer + 末尾模板表 TableLayer
+	// V2 段(工票 12):bgV2 垫底 ImageLayer + 模板表 TableLayer;
+	// autoWidth 段(工单 02):末尾两个宽自适应文本层
 	wantTypes := []string{
 		layer.TypeImage, layer.TypeImage, layer.TypeImage, layer.TypeText, layer.TypeText,
 		layer.TypeTable, layer.TypeQrCode, layer.TypeImage, layer.TypeText,
-		layer.TypeTable,
+		layer.TypeTable, layer.TypeText, layer.TypeText,
 	}
-	wantPriorities := []int{11, 11, 10, 5, 4, 4, 4, 4, 4, 4}
+	wantPriorities := []int{11, 11, 10, 5, 4, 4, 4, 4, 4, 4, 4, 4}
 	if !reflect.DeepEqual(gotTypes, wantTypes) {
 		t.Errorf("图层类型序 = %v, want %v", gotTypes, wantTypes)
 	}
@@ -148,8 +149,8 @@ func TestRenderSampleSmoke(t *testing.T) {
 	if !ok {
 		t.Fatalf("产物类型 %T, want *image.NRGBA", product)
 	}
-	if img.Bounds().Dx() != 400 || img.Bounds().Dy() != 460 { // V2 样例区加高
-		t.Fatalf("产物 = %dx%d, want 400x460(V2 模板表样例区加高,工票 12)", img.Bounds().Dx(), img.Bounds().Dy())
+	if img.Bounds().Dx() != 400 || img.Bounds().Dy() != 520 { // V2 样例区 + autoWidth 样例区
+		t.Fatalf("产物 = %dx%d, want 400x520(V2 模板表 + autoWidth 样例区)", img.Bounds().Dx(), img.Bounds().Dy())
 	}
 
 	// 落盘产物:PNG 魔数 + 可解码
@@ -168,7 +169,7 @@ func TestRenderSampleSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatalf("产物不可解码: %v", err)
 	}
-	if decoded.Bounds().Dx() != 400 || decoded.Bounds().Dy() != 460 { // V2 样例区加高
-		t.Fatalf("解码产物 = %dx%d, want 400x460(V2 模板表样例区加高,工票 12)", decoded.Bounds().Dx(), decoded.Bounds().Dy())
+	if decoded.Bounds().Dx() != 400 || decoded.Bounds().Dy() != 520 { // V2 样例区 + autoWidth 样例区
+		t.Fatalf("解码产物 = %dx%d, want 400x520(V2 模板表 + autoWidth 样例区)", decoded.Bounds().Dx(), decoded.Bounds().Dy())
 	}
 }
