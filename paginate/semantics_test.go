@@ -1,9 +1,8 @@
-//go:build semantics
-
 package paginate_test
 
-// 分页/文档语义红绿预言机(工票 08):两份三端共享语义 fixture 逐用例驱动
-// Go 管线「解码 → paginate/compile 入口 → 比对 expect(页 graph 列表或 errorCode)」。
+// 分页/文档语义 fixture runner(工票 08 立预言机,工票 10 全绿并入 make test):
+// 两份三端共享语义 fixture 逐用例驱动 Go 管线「解码 → paginate/compile 入口 →
+// 比对 expect(页 graph 列表或 errorCode)」。
 //
 //   - paginate/testdata/paginate-semantics.json(paginate-semantics v1,12 用例)
 //     管线 = graph → canvas.FromGraph → Paginator.Paginate → 页 graph 列表
@@ -12,11 +11,7 @@ package paginate_test
 //     DocumentCompiler.Compile(frames, dataset, flowChain) → 帧序×页序页 graph 列表
 //
 // 语义权威 = php-canvas-next(再生成 make paginate-fixtures / flow-fixtures,
-// 人审 diff 即双端语义行为 diff)。工票 08 管线入口为未实现桩(ErrNotImplemented),
-// 全红属红基线预期;工票 09 转绿链校验用例、工票 10 全绿后撤 build tag
-// 并入 make test(hydrate/fixture_test.go 同惯例)。
-//
-// 跑法:make semantics(go test -tags semantics)。
+// 人审 diff 即双端语义行为 diff)。
 
 import (
 	"encoding/json"
@@ -29,7 +24,7 @@ import (
 )
 
 // fixtureErrorCodes 稳定 code → sentinel 映射(spec §4.2.6/§10.4 两段全量;
-// fixture errorCode 字符串经它对位 errors.Is)。报错位随工票 09/10 落地
+// fixture errorCode 字符串经它对位 errors.Is)。
 var fixtureErrorCodes = map[string]error{
 	"content_overflow":            paginate.ErrContentOverflow,
 	"paginate_target_invalid":     paginate.ErrPaginateTargetInvalid,
@@ -116,9 +111,6 @@ func runPipelineCase(t *testing.T, pagesKey string, expect json.RawMessage, canv
 	if json.Unmarshal(expect, &wantErr) == nil && wantErr.ErrorCode != "" {
 		if err == nil {
 			t.Fatalf("预期错误 %s,但管线成功(产出 %d 页)", wantErr.ErrorCode, len(canvases))
-		}
-		if errors.Is(err, paginate.ErrNotImplemented) {
-			t.Fatalf("管线未实现(桩),预期 errorCode %s", wantErr.ErrorCode)
 		}
 		if got := fixtureErrorCode(t, err); got != wantErr.ErrorCode {
 			t.Fatalf("错误 code = %s, want %s", got, wantErr.ErrorCode)

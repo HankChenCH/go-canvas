@@ -12,19 +12,18 @@ Go 移植版画布渲染库 `github.com/hankchen/go-canvas`：与 `php-canvas-ne
   - `table.go` + `rowtemplate.go` — 表三层容器（add 副作用同 PHP）+ V2 行模板 `TableRowTemplate`（宽度耦合沿用、高度耦合全豁免的装配路径 `AddTemplateContentLayer`/`cellFromGraph(template)`）。
   - 表达式载体（V2）：三内容层 `SetExpression`（value 载体恒镜像原文，字面 setter 解除标记）；wire 上 TextLayer 恒写三键 data、Image/Qr 条件写键（未标记两键）。
 - `hydrate/` — 数据填充步骤（V2，渲染前独立纯结构步骤）：`hydrate.NewHydrator(evaluator).Hydrate(canvas, dataset)`——全画布标记字段求值 + 模板表实例化；实现走 graph 层改写 + `canvas.FromGraph` 重建（V1 高度耦合重放免费来自解码路径）。含 `ExpressionEvaluator` 注入缝 + 默认受限插值求值器。
-- `paginate/` — 分页与文档编译契约面（spec §4/§10，ADR 0009）：`Paginator.Paginate`（Canvas 1→n，分页选项 `{pageHeight, truncate?}`）+ `DocumentCompiler.Compile`（N 帧 × 1 dataset × 流链，复用 hydrate）双入口；`FlowChainNode`（4 键封闭流链节点，宽松解码留存原始键面供链校验裁决）、`CompileResult`（帧序×页序页序列 + warnings）、paginate/document 两段稳定 code sentinel。**链校验已落地**（工票 09：`ValidateFlowChain` 逐规则镜像 PHP，导出供模板保存期预检；`Compile` 步骤 0 fail-fast 接线，其余步骤仍 `ErrNotImplemented`）：装箱/编译语义归工票 10；红绿预言机 = `make semantics`（两份语义 fixture 逐用例报告，build tag `semantics` 门控不进 `make test`；链校验用例已转绿，余红归工票 10）。
+- `paginate/` — 分页与文档编译管线（spec §4/§10，ADR 0009）：`Paginator.Paginate`（Canvas 1→n，分页选项 `{pageHeight, truncate?}`，页几何 fail-fast 在 Paginate 入口）+ `DocumentCompiler.Compile`（N 帧 × 1 dataset × 流链，spec §10.3 时序：0 链校验 → 1 全量 hydrate → 2 flow 分配 → 3 回写+分页）双入口；`FlowChainNode`（4 键封闭流链节点，宽松解码留存原始键面供链校验裁决）、`CompileResult`（帧序×页序页序列 + warnings）、paginate/document 两段稳定 code sentinel。**全管线已落地**：链校验 `ValidateFlowChain` 逐规则镜像 PHP 并导出供模板保存期预检（工票 09）；装箱/编译语义镜像 PHP `CanvasPaginator`/`DocumentCompiler`/`Compiler\Flow`（工票 10：`geometry.go` 表几何共享件、`flow.go` 消费策略族 CapacityTake/QuotaTake/PagedTake，paginator/document 走「graph rows 整体替换 → FromGraph 重建」同型路径）——语义 fixture 全绿并入 `make test`；warnings 恒空（Go hydrate 面尚无软诊断发射缝，发射缝落地时在 `hydrateAll` 接线）。
 - `renderer/` — 渲染契约与模板：后端只实现 `Begin/End/DrawRect/DrawImage/DrawText` 五原语（可选实现 `DefaultResolver()` 自带默认物化器，nil-resolver 组装时优先采用）；泛型辅助 `RenderAs[T]`/`RenderLayerAs[T]`（ADR-0010，复用 `New(backend, nil)` 模板路径）把产物类型断言收敛到调用方泛型实参；**渲染器无预遍历**——paintImage/paintText/paintQrCode 分支开头按需 `ResolveLayer`（text 分支先物化再 `Lines()`），失败即抛、渲染面丢弃（end 不达）。
 - `resolver/` — 资源物化（下载/缓存/QR 缝），结果回写图层（`SetResolvedSrc/SetResolvedFont`）。`Resolve` 全画布预遍历 API 保留但渲染器不再调用（角色 = 绘制时物化）。
 - `text/` — 断行/度量契约 + 对齐版默认实现；注入点在 `layer.TextLayer`。
 - `image-renderer/` — 嵌套 module：位图后端（`imagerenderer.Renderer` 实现 Backend；`NewRenderer` 返回携带默认物化器——二维码缝默认接线——的具体后端，配 `RenderAs` 即完整管线）+ `typography/` 增强文本 + `cmd/visualcheck` 目验样图。
-- 共享 fixture（均 PHP 导出、JSON 提交进本仓库）：`hydrate/testdata/`（expression-eval v1 + expand-semantics v1，runner = `hydrate/fixture_test.go`）、`paginate/testdata/`（paginate-semantics v1 + flow-semantics v1，工票 08 起红绿预言机 runner = `paginate/semantics_test.go` / `make semantics`，实现全绿后并入 make test）、`renderer/testdata/layout-snapshot.json`（布局快照，见 `docs/layout-snapshot.md`）。
+- 共享 fixture（均 PHP 导出、JSON 提交进本仓库）：`hydrate/testdata/`（expression-eval v1 + expand-semantics v1，runner = `hydrate/fixture_test.go`）、`paginate/testdata/`（paginate-semantics v1 + flow-semantics v1，runner = `paginate/semantics_test.go`，随常规 `go test` 运行——工票 10 全绿起预言机并入 `make test`）、`renderer/testdata/layout-snapshot.json`（布局快照，见 `docs/layout-snapshot.md`）。
 
 ## Commands
 
 ```sh
-make test             # 核心 module + image-renderer 两轮 go test
+make test             # 核心 module + image-renderer 两轮 go test(含两份语义 fixture runner)
 make vet
-make semantics        # 分页/文档语义红绿预言机(工票 08:桩期全红属预期,09/10 落地转绿)
 make layout-snapshot  # PHP 导出布局快照（需 PHP 8.3 + ext-intl），人审 diff 后随代码提交
 make hydrate-fixtures  # PHP 导出 V2 共享 fixture（同上）
 make visual-check     # 目验样图 → image-renderer/visual-check.png

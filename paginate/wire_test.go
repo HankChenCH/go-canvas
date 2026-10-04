@@ -1,12 +1,13 @@
 package paginate
 
-// paginate 契约面行为测试(工票 08):wire 类型解码行为 + 桩形态。
+// paginate 契约面行为测试(工票 08):wire 类型解码行为 + 入口守卫。
 // 置于包内测试(而非 paginate_test)——FlowChainNode 的原始键面是链校验(工票 09)
 // 的裁决输入,封闭键捕获行为只能在包内断言。
 
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -96,7 +97,7 @@ func TestPaginateOptionsDecode(t *testing.T) {
 	}
 
 	// pageHeight: 0 是合法解码值(几何校验 page_geometry_invalid 属分页期语义,
-	// 工票 10 裁决)——选项类型不得吞掉 0 与缺席的区分
+	// 裁决在 Paginate 入口)——选项类型不得吞掉 0 与缺席的区分
 	var zero PaginateOptions
 	if err := json.Unmarshal([]byte(`{"pageHeight": 0}`), &zero); err != nil {
 		t.Fatalf("解码零页高: %v", err)
@@ -133,13 +134,18 @@ func TestStableErrorCodes(t *testing.T) {
 	}
 }
 
-// 工票 08 只钉契约面:两个管线入口均为未实现桩,fixture 预言机据此报红基线
-func TestPipelineStubsNotImplemented(t *testing.T) {
-	if _, err := NewPaginator(PaginateOptions{}).Paginate(nil); !errors.Is(err, ErrNotImplemented) {
-		t.Errorf("Paginate 桩 err = %v, want ErrNotImplemented", err)
+// frames_empty 入口守卫:调用方编程错误不立三端锚点 code(spec §10.4,
+// PHP InvalidArgumentException 同构)——普通可读 error,不进稳定 code 集
+func TestCompileFramesEmptyGuard(t *testing.T) {
+	_, err := NewDocumentCompiler(nil).Compile(nil, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "frames_empty") {
+		t.Errorf("Compile(nil frames) err = %v, want frames_empty 守卫错误", err)
 	}
-	if _, err := NewDocumentCompiler(nil).Compile(nil, nil, nil); !errors.Is(err, ErrNotImplemented) {
-		t.Errorf("Compile 桩 err = %v, want ErrNotImplemented", err)
+	for _, sentinel := range []error{ErrContentOverflow, ErrPaginateTargetInvalid, ErrPageGeometryInvalid,
+		ErrFlowChainInvalid, ErrFlowRowsPathInconsistent} {
+		if errors.Is(err, sentinel) {
+			t.Errorf("frames_empty 不得落入稳定 code 集: %v", sentinel)
+		}
 	}
 }
 

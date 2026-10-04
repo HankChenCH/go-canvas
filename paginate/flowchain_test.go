@@ -376,19 +376,25 @@ func TestCompileRunsChainValidation(t *testing.T) {
 	compiler := NewDocumentCompiler(nil)
 	frames := []*canvas.Canvas{frameOf(templateTable("order.items"))}
 
-	// 非法链:校验错误穿透桩直接浮出(不是 ErrNotImplemented)
+	// 非法链:校验错误先于 hydrate 直接浮出(spec §10.3 步骤 0)
 	_, err := compiler.Compile(frames, nil, chainFromJSON(t, `[{"frame":7,"mode":"paged"}]`))
 	wantCode(t, err, ErrFlowChainInvalid)
 
-	// 合法链:校验通过后抵达未实现段(分配/分页语义归工票 10)
-	_, err = compiler.Compile(frames, nil, chainFromJSON(t, `[{"frame":0,"mode":"fixed"}]`))
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("合法链 err = %v, want ErrNotImplemented(工票 10 桩)", err)
+	// 合法链 + 未绑数据集:恒等直通——模板帧以声明态零行空壳单页直通(spec §10.3 第 5 条)
+	result, err := compiler.Compile(frames, nil, chainFromJSON(t, `[{"frame":0,"mode":"fixed"}]`))
+	if err != nil {
+		t.Fatalf("合法链 err = %v, want nil", err)
+	}
+	if len(result.Canvases) != 1 {
+		t.Fatalf("未绑数据集流路径页数 = %d, want 1(声明态空壳直通)", len(result.Canvases))
 	}
 
-	// 显式空链与 nil 同义 = 无流路径,不经链校验直抵桩
-	_, err = compiler.Compile(frames, nil, nil)
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("空链 err = %v, want ErrNotImplemented", err)
+	// 显式空链与 nil 同义 = 无流路径,不经链校验分流(spec §10.2)
+	result, err = compiler.Compile(frames, nil, nil)
+	if err != nil {
+		t.Fatalf("空链 err = %v, want nil", err)
+	}
+	if len(result.Canvases) != 1 {
+		t.Fatalf("空链页数 = %d, want 1(分页关单页直通)", len(result.Canvases))
 	}
 }
