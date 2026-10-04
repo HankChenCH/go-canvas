@@ -15,7 +15,7 @@ else
 endif
 endif
 
-.PHONY: test vet layout-snapshot hydrate-fixtures paginate-fixtures flow-fixtures visual-check
+.PHONY: test vet semantics layout-snapshot hydrate-fixtures paginate-fixtures flow-fixtures visual-check
 
 test:
 	go test ./...
@@ -24,6 +24,14 @@ test:
 vet:
 	go vet ./...
 	cd image-renderer && go vet ./...
+
+# 分页/文档语义红绿预言机(工票 08):两份语义 fixture 逐用例驱动 Go 管线
+# (解码 → paginate/compile 入口 → 比对 expect),runner 见 paginate/semantics_test.go。
+# build tag 门控使存量 make test 零影响;工票 08 管线入口是未实现桩,全红属红基线
+# 预期、目标以非零码失败并列出失败清单——工票 09 转绿链校验用例,工票 10 全绿后
+# 撤 build tag 并入 make test
+semantics:
+	go test -tags semantics -v -run 'TestPaginateSemanticsFixtures|TestFlowSemanticsFixtures' ./paginate/
 
 layout-snapshot:
 	$(PHP) ../php-canvas-next/scripts/export-layout-snapshot.php renderer/testdata/layout-snapshot.json
