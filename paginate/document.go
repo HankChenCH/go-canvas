@@ -78,7 +78,7 @@ type CompileResult struct {
 // 与单画布管线共享内部件(hydrate.Hydrator / Paginator)、不共享模板方法。
 // evaluator 注入链 = 构造器传入全量 hydrate(全库唯一可替换面,nil = 默认求值器)。
 //
-// 工票 08 仅契约面:链校验归工票 09,无流/流装箱语义归工票 10
+// 链校验已落地(工票 09,ValidateFlowChain);无流/流装箱语义归工票 10
 type DocumentCompiler struct {
 	evaluator hydrate.ExpressionEvaluator
 }
@@ -92,6 +92,15 @@ func NewDocumentCompiler(evaluator hydrate.ExpressionEvaluator) *DocumentCompile
 // 产物页序列帧序 × 页序扁平拼接(flowChain 空 = 纯文档级管线,spec §10.2)。
 // 空 frames = 调用方编程错误(不立三端锚点 code);链校验/分配/分页错误
 // 以稳定 code 抛出(§10.4)
+//
+// 步骤 0 链校验已接线(工票 09,fail-fast 于入口、先于全量 hydrate,spec §10.3
+// 时序;显式空链与 nil 同义 = 无流路径,不经链校验分流);frames_empty 守卫与
+// 步骤 1–3(全量 hydrate → flow 分配 → 回写分页)随工票 10 落地
 func (c *DocumentCompiler) Compile(frames []*canvas.Canvas, dataset any, flowChain []FlowChainNode) (*CompileResult, error) {
+	if len(flowChain) > 0 {
+		if _, err := ValidateFlowChain(frames, flowChain); err != nil {
+			return nil, err
+		}
+	}
 	return nil, ErrNotImplemented
 }
