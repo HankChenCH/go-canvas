@@ -250,8 +250,9 @@ func (r *template) paintText(ctx context.Context, l *layer.TextLayer, x, y int) 
 }
 
 // paintQrCode 二维码图层:绘制分派前按需物化(spec §4.3,失败即抛渲染面丢弃),
-// 先画自身盒,再按宽度正方形铺放
-// (与 PHP 模板一致,忽略声明高度;src 未物化为 nil 时只画盒)
+// 先画自身盒,再内切正方形铺放——边长 = min(内容区宽高)(quiet zone 语义,padding
+// 留白即码外静区),对齐 + padding 定位(与 PHP 模板一致,镜像 paintImage 语义);
+// 边长 ≤0 由后端 DrawImage 防护只画盒;src 未物化为 nil 时只画盒
 func (r *template) paintQrCode(ctx context.Context, l *layer.QrCodeLayer, x, y int) error {
 	if err := r.resolver.ResolveLayer(ctx, l); err != nil {
 		return err
@@ -264,5 +265,7 @@ func (r *template) paintQrCode(ctx context.Context, l *layer.QrCodeLayer, x, y i
 	if src == nil {
 		return nil
 	}
-	return r.backend.DrawImage(*src, x, y, l.Width(), l.Width())
+	originX, originY := l.QrOrigin()
+	side := l.ContentSide()
+	return r.backend.DrawImage(*src, x+originX, y+originY, side, side)
 }

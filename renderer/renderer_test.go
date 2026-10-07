@@ -328,7 +328,8 @@ func TestTextLayerDrawsLinesWithLineHeightAccumulation(t *testing.T) {
 }
 
 func TestQrCodeLayerPlacedSquareByWidth(t *testing.T) {
-	// 二维码按宽度正方形铺放,忽略声明高度 50
+	// 二维码内切于内容盒(边长 = min(内容区宽高)):padding 0 时边长仍取声明宽,
+	// 声明高 50 只提供纵向余量
 	qr := layer.NewQrCodeLayer(layer.WithSize(30, 50), layer.WithPosition(1, 1))
 	qr.SetResolvedSrc("/tmp/qr.png")
 	backend := &fakeBackend{}
@@ -344,6 +345,42 @@ func TestQrCodeLayerPlacedSquareByWidth(t *testing.T) {
 	if img := backend.images[0]; img.src != "/tmp/qr.png" || img.x != 1 || img.y != 1 || img.w != 30 || img.h != 30 {
 		t.Errorf("image = (%s, %d, %d, %d, %d), want (/tmp/qr.png, 1, 1, 30, 30)",
 			img.src, img.x, img.y, img.w, img.h)
+	}
+}
+
+// TestQrCodePaddingLeavesQuietZone quiet zone 语义(三端契约):padding 留白 = 码外静区,
+// 码内切于内容盒、left/top 缺省锚定 padding 原点
+func TestQrCodePaddingLeavesQuietZone(t *testing.T) {
+	// 100×100、padding 全边 20:边长 = min(60, 60) = 60,码放 (21, 21) 起
+	qr := layer.NewQrCodeLayer(layer.WithSize(100, 100), layer.WithPadding(20),
+		layer.WithPosition(1, 1))
+	qr.SetResolvedSrc("/tmp/qr.png")
+	backend := &fakeBackend{}
+	r := newRenderer(t, backend)
+
+	if _, err := r.RenderLayer(context.Background(), qr); err != nil {
+		t.Fatalf("RenderLayer: %v", err)
+	}
+	if img := backend.images[0]; img.src != "/tmp/qr.png" || img.x != 21 || img.y != 21 || img.w != 60 || img.h != 60 {
+		t.Errorf("image = (%s, %d, %d, %d, %d), want (/tmp/qr.png, 21, 21, 60, 60)",
+			img.src, img.x, img.y, img.w, img.h)
+	}
+}
+
+// TestQrCodeCenteredInNonSquareBox 非正方形盒:边长 = min(100, 60) = 60,
+// center/center 在整盒内居中 → (21+20, 1+0)
+func TestQrCodeCenteredInNonSquareBox(t *testing.T) {
+	qr := layer.NewQrCodeLayer(layer.WithSize(100, 60), layer.WithPosition(1, 1),
+		layer.WithHorizontalAlign(layer.AlignCenter), layer.WithVerticalAlign(layer.AlignCenter))
+	qr.SetResolvedSrc("/tmp/qr.png")
+	backend := &fakeBackend{}
+	r := newRenderer(t, backend)
+
+	if _, err := r.RenderLayer(context.Background(), qr); err != nil {
+		t.Fatalf("RenderLayer: %v", err)
+	}
+	if img := backend.images[0]; img.x != 21 || img.y != 1 || img.w != 60 || img.h != 60 {
+		t.Errorf("image = (%d, %d, %d, %d), want (21, 1, 60, 60)", img.x, img.y, img.w, img.h)
 	}
 }
 

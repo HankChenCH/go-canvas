@@ -31,13 +31,13 @@ import (
 // 尺寸允许小数,模块数超过 size 时抛 BlockSizeTooSmallException);yeqown 的
 // WithQRWidth 是**整数**块像素宽,出图 = 模块数×块宽——对目标宽向下量化,而
 // 目标宽小于矩阵边长时块宽钳到 1,出图反大于目标宽(endroid 同场景直接抛错)。
-// 本项目规避方式与 PHP 一致:生成后由渲染原语按宽正方形 cover 缩放铺放,上述
+// 本项目规避方式与 PHP 一致:生成后由渲染原语内切正方形 cover 缩放铺放(ADR 0015),上述
 // 差异在渲染面不可见,只影响缓存 PNG 的绝对尺寸。
 type QRMaterializer struct{}
 
 var _ resolver.QRMaterializer = QRMaterializer{}
 
-// Materialize implements resolver.QRMaterializer。width 为铺放宽度(正方形);
+// Materialize implements resolver.QRMaterializer。width 为生成基准宽度(图层宽);
 // 库本身不支持 ctx,取消语义只在更外层(缓存/下载侧)生效
 func (QRMaterializer) Materialize(_ context.Context, text string, width int) ([]byte, error) {
 	size := max(width, 1) // 对齐 endroid size=max(图层宽,1)

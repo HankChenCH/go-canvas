@@ -64,6 +64,42 @@ func (l *QrCodeLayer) ContentHeight() int {
 	return contentHeightOf(l.Height(), l.padding)
 }
 
+// ContentSide 二维码内容边长 = min(内容区宽, 内容区高):内切于内容盒的正方形
+// (quiet zone 语义——padding 留白即码外静区),≤0 时绘制端 DrawImage 防护只画盒;
+// 内容区负值直通(PHP intval 同门,不钳零)
+func (l *QrCodeLayer) ContentSide() int {
+	return min(l.ContentWidth(), l.ContentHeight())
+}
+
+// QrOrigin 二维码在内容盒内的放置起点(对齐 + padding,PHP getQrOrigin 同款参照系:
+// 镜像 ImageLayer.ImageOrigin,内容尺寸换成内切边长)。纯布局计算,渲染端共用;
+// 未知取值归 0(PHP match default 臂);整除向零截断,对齐 PHP intval
+func (l *QrCodeLayer) QrOrigin() (int, int) {
+	side := l.ContentSide()
+
+	posx := 0
+	switch l.horizontalAlign {
+	case AlignLeft:
+		posx = int(l.padding.Left)
+	case AlignCenter:
+		posx = (l.Width() - side) / 2
+	case AlignRight:
+		posx = l.Width() - side
+	}
+
+	posy := 0
+	switch l.verticalAlign {
+	case AlignTop:
+		posy = int(l.padding.Top)
+	case AlignCenter:
+		posy = (l.Height() - side) / 2
+	case AlignBottom:
+		posy = l.Height() - side
+	}
+
+	return posx, posy
+}
+
 // TypeName implements Layer
 func (l *QrCodeLayer) TypeName() string { return TypeQrCode }
 
