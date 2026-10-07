@@ -9,9 +9,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/hydrate"
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/hydrate"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // v2TemplateTable 模板表:红格(auto 文本格,行上下文求值)+ 蓝格(固定 40,

@@ -9,7 +9,7 @@ package paginate
 // ——两侧数学由各自语义 fixture(布局快照 / 分页语义)钉死,漂移即红。
 
 import (
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // shellTop 表壳顶 y:锚点按给定页/画布尺寸解析 + 声明 y 偏移。

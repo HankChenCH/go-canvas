@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // templateTableFixture 主模板表:文本格（表达式标记,镜像 value）+ 固定图片格,

@@ -20,8 +20,8 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // 流链节点 mode 取值(PHP MODE_FIXED/MODE_PAGED 私有常量同款,包内共用)

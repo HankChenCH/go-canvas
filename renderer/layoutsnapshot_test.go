@@ -24,8 +24,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // snapshotRecord 快照绘制记录(rect/text/image 三态,字段按 op 取用)

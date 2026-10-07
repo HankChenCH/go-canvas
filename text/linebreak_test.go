@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/hankchen/go-canvas/text"
+	"github.com/HankChenCH/go-canvas/text"
 )
 
 const fontSize10 = 10

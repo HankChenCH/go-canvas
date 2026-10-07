@@ -1,0 +1,8 @@
+// 本仓库双 module 本地开发工作区:image-renderer 经此即时解析本地核心 module。
+// 发布后的消费方解析(走 module proxy)由 CI 的 GOWORK=off job 验证。
+go 1.25.0
+
+use (
+	.
+	./image-renderer
+)

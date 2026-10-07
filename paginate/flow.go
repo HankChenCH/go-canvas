@@ -7,8 +7,8 @@ package paginate
 import (
 	"fmt"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // flowConsumer 流消费策略(spec §10.3):对剩余行序列取一份额,take 返回摄取行数。

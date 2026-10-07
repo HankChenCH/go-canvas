@@ -11,7 +11,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 func dataOf(t *testing.T, n layer.Node) string {

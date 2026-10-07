@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 func TestQrCodeDeclaredHeightWinsWhenNotAuto(t *testing.T) {

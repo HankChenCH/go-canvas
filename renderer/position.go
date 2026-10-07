@@ -1,7 +1,7 @@
 package renderer
 
 import (
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // 九锚点定位解析:把 top-left/center/bottom-right 等锚点串换算为子层在

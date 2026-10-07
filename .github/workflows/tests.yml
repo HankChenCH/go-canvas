@@ -1,0 +1,44 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: Core (GOWORK=off)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Run tests
+        run: go test ./...
+        env:
+          GOWORK: 'off'
+
+  image-renderer:
+    name: image-renderer (consumer resolution, GOWORK=off)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: image-renderer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: image-renderer/go.mod
+      # 模拟真实消费方:GOWORK=off 且无 replace,核心 module 走 module proxy 解析
+      - name: Run tests against module proxy
+        run: go test ./...
+        env:
+          GOWORK: 'off'

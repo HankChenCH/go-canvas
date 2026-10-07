@@ -7,7 +7,7 @@ import (
 	"image"
 	"testing"
 
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // newSurfaceBackend 建面 20×20 的后端

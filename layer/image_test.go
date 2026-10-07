@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 func TestSetImageStoresRawValueOnly(t *testing.T) {

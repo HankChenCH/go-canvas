@@ -17,9 +17,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/layer"
-	"github.com/hankchen/go-canvas/resolver"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/resolver"
 )
 
 // fakeDownloader Downloader 手工桩:记录调用并返回预设内容,err 模拟下载失败

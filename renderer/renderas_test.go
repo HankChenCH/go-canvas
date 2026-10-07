@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/layer"
-	"github.com/hankchen/go-canvas/renderer"
-	"github.com/hankchen/go-canvas/resolver"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/renderer"
+	"github.com/HankChenCH/go-canvas/resolver"
 )
 
 func TestRenderAsPassesThroughEndProductWhenTypeMatches(t *testing.T) {

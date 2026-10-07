@@ -14,9 +14,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/hydrate"
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/hydrate"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // hydrateErrorCodes 稳定 code → sentinel 映射(跨包汇总解码期与填充期;

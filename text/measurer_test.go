@@ -7,7 +7,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/hankchen/go-canvas/text"
+	"github.com/HankChenCH/go-canvas/text"
 )
 
 const delta = 0.001

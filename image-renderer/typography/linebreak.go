@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-text/typesetting/segmenter"
 
-	"github.com/hankchen/go-canvas/text"
+	"github.com/HankChenCH/go-canvas/text"
 )
 
 // Uax14LineBreaker 完整 UAX #14 断行器:断点候选来自 LineIterator

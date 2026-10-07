@@ -21,12 +21,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/hydrate"
-	"github.com/hankchen/go-canvas/image-renderer"
-	"github.com/hankchen/go-canvas/image-renderer/typography"
-	"github.com/hankchen/go-canvas/layer"
-	"github.com/hankchen/go-canvas/renderer"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/hydrate"
+	"github.com/HankChenCH/go-canvas/image-renderer"
+	"github.com/HankChenCH/go-canvas/image-renderer/typography"
+	"github.com/HankChenCH/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/renderer"
 )
 
 // fontCandidates 字体候选:优先带 CJK 字形的字体,避免中文变豆腐块;
@@ -144,7 +144,7 @@ func buildSample(font string) (*canvas.Canvas, map[string]any, error) {
 
 	// 二维码(表格右侧)
 	qrCode := layer.NewQrCodeLayer(
-		layer.WithSize(90, 90), layer.WithQrText("https://github.com/hankchen/go-canvas"),
+		layer.WithSize(90, 90), layer.WithQrText("https://github.com/HankChenCH/go-canvas"),
 		layer.WithPosition(280, 250), layer.WithPriority(4),
 	)
 

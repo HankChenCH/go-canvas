@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hankchen/go-canvas/layer"
-	"github.com/hankchen/go-canvas/resolver"
+	"github.com/HankChenCH/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/resolver"
 )
 
 func TestResolveLayerEntryCheckpoint(t *testing.T) {

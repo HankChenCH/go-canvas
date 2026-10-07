@@ -11,7 +11,7 @@
 ## 仓库与模块
 
 - 位置：本目录（工作区子目录，独立 git 仓库）；暂无远端、暂不配 CI，推远端时再加 GitHub Actions。
-- module path：`github.com/hankchen/go-canvas`；Go 基线 1.25。
+- module path：`github.com/HankChenCH/go-canvas`；Go 基线 1.25。
 - **2 modules**：
   - 根 module = 核心包（`canvas`/`layer`/`renderer`/`resolver`/`text`/`hydrate`），**纯 stdlib 零第三方依赖**（ADR-0002）；依赖方向 canvas ← {renderer, resolver, hydrate}、text ← layer ← canvas（hydrate 属结构侧，只读 canvas/layer），由 import 图在编译期硬保证。
   - `image-renderer/`（M2 新建嵌套 module）：x/image、go-text/typesetting、go-qrcode、按需 bild。

@@ -11,7 +11,7 @@ import (
 	"image/color"
 	"io"
 
-	"github.com/hankchen/go-canvas/resolver"
+	"github.com/HankChenCH/go-canvas/resolver"
 
 	qr "github.com/yeqown/go-qrcode/v2"
 	"github.com/yeqown/go-qrcode/writer/standard"

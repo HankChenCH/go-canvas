@@ -8,8 +8,8 @@ import (
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 
-	"github.com/hankchen/go-canvas/resolver"
-	"github.com/hankchen/go-canvas/text"
+	"github.com/HankChenCH/go-canvas/resolver"
+	"github.com/HankChenCH/go-canvas/text"
 )
 
 // IsBuiltinFont 内置默认字体判定:空串/纯数字字体 id(与核心 resolver.IsNumeric

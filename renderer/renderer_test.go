@@ -10,11 +10,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/layer"
-	"github.com/hankchen/go-canvas/renderer"
-	"github.com/hankchen/go-canvas/resolver"
-	"github.com/hankchen/go-canvas/text"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/renderer"
+	"github.com/HankChenCH/go-canvas/resolver"
+	"github.com/HankChenCH/go-canvas/text"
 )
 
 // ---- 假 Backend:记录原语调用序列与坐标 ----

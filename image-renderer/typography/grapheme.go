@@ -8,7 +8,7 @@ package typography
 import (
 	"github.com/go-text/typesetting/segmenter"
 
-	"github.com/hankchen/go-canvas/text"
+	"github.com/HankChenCH/go-canvas/text"
 )
 
 // GraphemeSegmenter UAX #29 字素簇切分器。零状态,值类型可共享;

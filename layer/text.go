@@ -4,7 +4,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/hankchen/go-canvas/text"
+	"github.com/HankChenCH/go-canvas/text"
 )
 
 // TextLayer 文本图层:断行与度量经可注入策略完成(布局纯函数,渲染端共享同一结果)。

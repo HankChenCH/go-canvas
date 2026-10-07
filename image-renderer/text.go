@@ -17,8 +17,8 @@ import (
 	"golang.org/x/image/math/f64"
 	"golang.org/x/image/math/fixed"
 
-	"github.com/hankchen/go-canvas/image-renderer/typography"
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/image-renderer/typography"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // fontKey Face 缓存键:字体文件路径 + 字号

@@ -1,7 +1,7 @@
 package renderer
 
 import (
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // Backend 绘制原语契约(扩展点):渲染后端作者只实现五个原语即可接入完整渲染管线

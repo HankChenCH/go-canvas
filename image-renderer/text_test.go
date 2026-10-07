@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // systemFont 按扩展名给出本机候选字体文件(跨平台测试用),找不到返回空串。

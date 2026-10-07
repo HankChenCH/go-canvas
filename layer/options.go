@@ -1,7 +1,7 @@
 package layer
 
 import (
-	"github.com/hankchen/go-canvas/text"
+	"github.com/HankChenCH/go-canvas/text"
 )
 
 // 选项机制:Go 无继承,公共设定与图层专属设定经"接口分隔"达成编译期类型安全——

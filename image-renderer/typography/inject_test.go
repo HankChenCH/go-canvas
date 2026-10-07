@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hankchen/go-canvas/image-renderer/typography"
-	"github.com/hankchen/go-canvas/layer"
-	"github.com/hankchen/go-canvas/text"
+	"github.com/HankChenCH/go-canvas/image-renderer/typography"
+	"github.com/HankChenCH/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/text"
 )
 
 func TestTextLayerInjectsEnhancedStack(t *testing.T) {

@@ -6,7 +6,7 @@ package renderer_test
 import (
 	"testing"
 
-	"github.com/hankchen/go-canvas/renderer"
+	"github.com/HankChenCH/go-canvas/renderer"
 )
 
 // testNineAnchors 平移 testNineAnchors:父盒 100×80、子层 20×10,九锚点偏移

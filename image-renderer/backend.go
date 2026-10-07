@@ -13,9 +13,9 @@ import (
 	"image/draw"
 	"os"
 
-	"github.com/hankchen/go-canvas/layer"
-	"github.com/hankchen/go-canvas/renderer"
-	"github.com/hankchen/go-canvas/resolver"
+	"github.com/HankChenCH/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/renderer"
+	"github.com/HankChenCH/go-canvas/resolver"
 	"golang.org/x/image/font"
 )
 

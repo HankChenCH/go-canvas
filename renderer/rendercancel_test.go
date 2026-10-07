@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/layer"
-	"github.com/hankchen/go-canvas/renderer"
-	"github.com/hankchen/go-canvas/resolver"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/renderer"
+	"github.com/HankChenCH/go-canvas/resolver"
 )
 
 // cancelAfterRectBackend 第 n 次 DrawRect 落笔后武装取消:模拟检查点之间的

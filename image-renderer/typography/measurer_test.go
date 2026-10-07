@@ -13,8 +13,8 @@ import (
 	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/font/gofont/goregular"
 
-	"github.com/hankchen/go-canvas/image-renderer/typography"
-	"github.com/hankchen/go-canvas/text"
+	"github.com/HankChenCH/go-canvas/image-renderer/typography"
+	"github.com/HankChenCH/go-canvas/text"
 )
 
 // seam 锁定:工厂函数类型与核心接缝对齐

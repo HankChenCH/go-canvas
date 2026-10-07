@@ -5,7 +5,7 @@ package canvas
 import (
 	"sort"
 
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // Canvas 画布容器

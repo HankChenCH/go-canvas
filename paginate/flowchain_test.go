@@ -11,8 +11,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // ---- 输入构造 helpers(PHP DocumentCompilerFlowTest 同名 helper 同构,结构从简:

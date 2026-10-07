@@ -13,8 +13,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/hankchen/go-canvas/layer"
-	"github.com/hankchen/go-canvas/text"
+	"github.com/HankChenCH/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/text"
 )
 
 // fakeBreaker 断行假实现:锁定断行器注入语义(PHP 匿名类同款)

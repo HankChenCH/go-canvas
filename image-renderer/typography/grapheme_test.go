@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/hankchen/go-canvas/image-renderer/typography"
-	"github.com/hankchen/go-canvas/text"
+	"github.com/HankChenCH/go-canvas/image-renderer/typography"
+	"github.com/HankChenCH/go-canvas/text"
 )
 
 // seam 锁定:实现可注入核心字素接缝

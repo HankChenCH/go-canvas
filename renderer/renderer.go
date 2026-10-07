@@ -8,9 +8,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/layer"
-	"github.com/hankchen/go-canvas/resolver"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/resolver"
 )
 
 // Renderer 渲染器契约:渲染管线对使用方的公开面(对应 PHP RendererInterface,

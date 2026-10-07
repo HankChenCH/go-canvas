@@ -19,8 +19,8 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // 绘制期错误稳定 code(spec §5.2,三端一致性抓手:消息可本地化,code 稳定;

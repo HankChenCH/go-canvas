@@ -10,9 +10,9 @@ import (
 	"errors"
 	"slices"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/hydrate"
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/hydrate"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // document 段稳定 code(spec §10.4,三端一致性锚点;消息可改、code 不可改):

@@ -15,10 +15,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hankchen/go-canvas/image-renderer"
-	"github.com/hankchen/go-canvas/layer"
-	"github.com/hankchen/go-canvas/renderer"
-	"github.com/hankchen/go-canvas/resolver"
+	"github.com/HankChenCH/go-canvas/image-renderer"
+	"github.com/HankChenCH/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/renderer"
+	"github.com/HankChenCH/go-canvas/resolver"
 )
 
 // testFont 取本机候选字体;无候选时跳过依赖字体的用例

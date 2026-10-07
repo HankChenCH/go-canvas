@@ -19,8 +19,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/paginate"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/paginate"
 )
 
 // fixtureErrorCodes 稳定 code → sentinel 映射(spec §4.2.6/§10.4 两段全量;

@@ -17,8 +17,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/hankchen/go-canvas/canvas"
-	"github.com/hankchen/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/layer"
 )
 
 // paginate 段稳定 code(spec §4.2.6,三端一致性锚点;消息可改、code 不可改)。
