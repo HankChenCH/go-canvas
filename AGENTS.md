@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Go 移植版画布渲染库 `github.com/HankChenCH/go-canvas`：与 `php-canvas-next`（PHP 权威端，本地同级 `../php-canvas-next`）共享同一领域语言与 graph wire 契约——`layer.Node` 逐字段键级对齐 PHP 各图层 `graph()` 产物，同一份 graph JSON 双端互读。核心 module **纯 stdlib 零第三方依赖**（ADR-0002）；位图后端是嵌套 module `image-renderer/`（go.mod `replace => ../`）。Go 1.25。中文是代码注释的工作语言；commit 用 conventional-commit 前缀 + 中文 subject。
+Go 移植版画布渲染库 `github.com/HankChenCH/go-canvas`：与 `php-canvas-next`（PHP 权威端，本地同级 `../php-canvas-next`）共享同一领域语言与 graph wire 契约——`layer.Node` 逐字段键级对齐 PHP 各图层 `graph()` 产物，同一份 graph JSON 双端互读。核心 module **纯 stdlib 零第三方依赖**（ADR-0002）；位图后端是嵌套 module `image-renderer/`（消费方走 module proxy 解析核心已发布 tag，本地双 module 联调经仓库根 `go.work`）。Go 1.25。中文是代码注释的工作语言；commit 用 conventional-commit 前缀 + 中文 subject。
 
 ## Layout
 
