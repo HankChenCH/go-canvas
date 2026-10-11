@@ -85,8 +85,8 @@ func TestExpressionEvalFixture(t *testing.T) {
 	if err := json.Unmarshal(loadFixture(t, "testdata/expression-eval.json"), &doc); err != nil {
 		t.Fatalf("解码 fixture: %v", err)
 	}
-	if doc.Meta.Contract != "expression-eval v1" {
-		t.Fatalf("contract = %q, want expression-eval v1", doc.Meta.Contract)
+	if doc.Meta.Contract != "expression-eval v2" {
+		t.Fatalf("contract = %q, want expression-eval v2", doc.Meta.Contract)
 	}
 
 	evaluator := hydrate.NewInterpolationEvaluator()
@@ -117,6 +117,41 @@ func TestExpressionEvalFixture(t *testing.T) {
 			}
 			if result != want {
 				t.Errorf("求值结果 = %q, want %q", result, want)
+			}
+		})
+	}
+}
+
+// TestDateTokensFixture 日期 token 转译表 runner(v2 增量,工票 06 ⑥ 双轨):
+// PHP DateFormat 权威导出,Go 内置同构表经求值器端到端断言锁漂移——token 本身
+// 作为格式串 {{date(row.d, 'TOKEN')}},与 PHP 导出端自检(DateFormat::format)
+// 同构
+func TestDateTokensFixture(t *testing.T) {
+	var doc struct {
+		DateTokens struct {
+			Sample string `json:"sample"`
+			Rows   []struct {
+				Token     string `json:"token"`
+				Semantics string `json:"semantics"`
+				Expect    string `json:"expect"`
+			} `json:"rows"`
+		} `json:"dateTokens"`
+	}
+	if err := json.Unmarshal(loadFixture(t, "testdata/expression-eval.json"), &doc); err != nil {
+		t.Fatalf("解码 fixture: %v", err)
+	}
+
+	evaluator := hydrate.NewInterpolationEvaluator()
+	context := map[string]any{"row": map[string]any{"d": doc.DateTokens.Sample}}
+	for _, row := range doc.DateTokens.Rows {
+		row := row
+		t.Run(row.Token, func(t *testing.T) {
+			got, err := evaluator.Evaluate("{{date(row.d, '"+row.Token+"')}}", context)
+			if err != nil {
+				t.Fatalf("token %s 求值意外报错: %v", row.Token, err)
+			}
+			if got != row.Expect {
+				t.Errorf("token %s 输出 = %q, want %q(内置表与 PHP 权威表漂移)", row.Token, got, row.Expect)
 			}
 		})
 	}
