@@ -29,6 +29,10 @@ var (
 	// ErrExpressionEmptyResource 资源类字段缺字段/null/求值空串
 	// (spec §3.4,空 URL/空码无意义,fail-fast 优于错误后移到物化)
 	ErrExpressionEmptyResource = errors.New("expression_empty_resource")
+	// ErrExpressionSingleResourceRef 资源表达式单值门违例(ADR 0020):已标记 Image/Qr 的
+	// expression 必须恰为一个 {{...}} 闭合片段 + 裸点路径(禁多片段拼接/片段外字面/
+	// 内建函数调用/空片段;格式化标量不是数据端备好的资源引用)
+	ErrExpressionSingleResourceRef = errors.New("expression_resource_single_ref")
 	// ErrExpressionTypeMismatch 数组/对象落到标量位或标量中途下钻(spec §3.4)
 	ErrExpressionTypeMismatch = errors.New("expression_type_mismatch")
 	// ErrExpressionSyntaxError 空表达式片段/非法路径/未知函数/参数个数/调用结构错

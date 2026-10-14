@@ -11,6 +11,7 @@
             "bool/数组/对象落函数参数位 = expression_type_mismatch（bool 字符串化双端不一致，直通无法对齐）；",
             "日期可解析输入收 3 种无时区 ISO 形态（wall clock），时间戳不收；数字族十进制字符串舍入（half-up 朝 +∞），",
             "数值字符串化/十进制语义只锁常规区间（整数/常规小数）；极端浮点（科学计数法阈值）不入 fixture、不保证双端一致（spec §4.3）；",
+            "资源表达式单值门（ADR 0020）不在求值器：文本插值语义零变化，违例/合法形态的 hydrate 级判定锁在 expand-semantics.json（expression_resource_single_ref）；",
             "再生成: go-canvas 仓 make hydrate-fixtures（需本机 PHP 8.3）"
         ]
     },

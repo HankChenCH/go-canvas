@@ -213,6 +213,14 @@ func (h *Hydrator) evaluateNode(node *layer.Node, root map[string]any, rowNamesp
 		return nil // 绑定面仅三类内容层(spec §3.1)
 	}
 
+	// 资源类单值门(ADR 0020):求值前 fail-fast,违例不可能被求值器救回
+	// (二维码把非空垃圾静默编成内容错误的码是该门的首要防线)
+	if isResource {
+		if err := assertSingleResourceRef(*node.Data.Expression); err != nil {
+			return err
+		}
+	}
+
 	// 行上下文 = 行命名空间 + 根键合并(命名空间分离,根级 row/$ 键已由
 	// assertReservedRootKeys 拦截,无键冲突;PHP $rowNamespace + $root 同款)
 	context := root
@@ -243,6 +251,30 @@ func (h *Hydrator) evaluateNode(node *layer.Node, root map[string]any, rowNamesp
 		node.Data.Expression = &empty // TextLayer 恒写 expression 键(现状形态)
 	} else {
 		node.Data.Expression = nil // Image/Qr 条件写键
+	}
+	return nil
+}
+
+// assertSingleResourceRef 资源表达式单值门(ADR 0020):已标记 Image/Qr 的 expression
+// 必须恰为一个 {{...}} 闭合片段且占满整串——禁多片段拼接、禁片段外字面、禁内建函数
+// 调用(格式化标量不是数据端备好的资源引用)、禁空片段;$index/$root. 前缀同为裸点路径
+// 放行。门只做语法判定,与数据集无关;校验先于求值与 empty_resource 空串检查
+func assertSingleResourceRef(expression string) error {
+	// 整串锚定匹配(PCRE /^\{\{([^{}]*)\}\}$/ 的字节面等价):内部禁花括号使
+	// 未闭合/多片段/片段外字面全拦,前后缀重叠形态(如 {{a}}}})由内检兜住不放行;
+	// PCRE $ 锚(无 D 修饰符)还容忍串尾恰一个 \n(PHP 权威端实证 {{orderNo}}\n
+	// 放行、\n\n 与 \r\n 拦截),锚定判定前剥同款尾换行,错误消息仍带原文
+	subject := strings.TrimSuffix(expression, "\n")
+	path := ""
+	if len(subject) >= 4 &&
+		strings.HasPrefix(subject, "{{") &&
+		strings.HasSuffix(subject, "}}") {
+		if inner := subject[2 : len(subject)-2]; !strings.ContainsAny(inner, "{}") {
+			path = phpTrim(inner)
+		}
+	}
+	if path == "" || strings.Contains(path, "(") {
+		return fmt.Errorf("%w: %s", ErrExpressionSingleResourceRef, expression)
 	}
 	return nil
 }

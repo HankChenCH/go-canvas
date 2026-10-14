@@ -163,10 +163,12 @@ func TestIndependentLayersEvaluateAtRootContext(t *testing.T) {
 	text := layer.NewTextLayer(layer.WithSize(200, 30), layer.WithFont("", 12, "#000"))
 	text.SetExpression("订单号：{{orderNo}}")
 	image := layer.NewImageLayer(layer.WithSize(60, 60))
-	image.SetExpression("{{orderNo}}.png")
+	image.SetExpression("{{orderNo}}")
+	qr := layer.NewQrCodeLayer(layer.WithSize(60, 60))
+	qr.SetExpression("{{$root.orderNo}}")
 
 	hydrated, err := hydrate.NewHydrator(nil).Hydrate(
-		canvas.New(320, 100, text, image), dataset())
+		canvas.New(320, 100, text, image, qr), dataset())
 	if err != nil {
 		t.Fatalf("Hydrate: %v", err)
 	}
@@ -175,8 +177,11 @@ func TestIndependentLayersEvaluateAtRootContext(t *testing.T) {
 	if got := layers[0].(*layer.TextLayer).Text(); got != "订单号：A2026-001" {
 		t.Errorf("独立文本 = %q, want 订单号：A2026-001", got)
 	}
-	if got := *layers[1].(*layer.ImageLayer).Image(); got != "A2026-001.png" {
-		t.Errorf("独立图片 = %q, want A2026-001.png", got)
+	if got := *layers[1].(*layer.ImageLayer).Image(); got != "A2026-001" {
+		t.Errorf("独立图片 = %q, want A2026-001", got)
+	}
+	if got := layers[2].(*layer.QrCodeLayer).Text(); got != "A2026-001" {
+		t.Errorf("独立二维码 = %q, want A2026-001($root. 前缀放行)", got)
 	}
 }
 
@@ -340,6 +345,147 @@ func TestEmptyResourceExpressionThrows(t *testing.T) {
 	_, err := hydrate.NewHydrator(nil).Hydrate(canvas.New(320, 400, templateTable()), ds)
 	if !errors.Is(err, hydrate.ErrExpressionEmptyResource) {
 		t.Errorf("错误 = %v, want ErrExpressionEmptyResource", err)
+	}
+}
+
+// ─── 资源表达式单值门(ADR 0020,issue 02;对拍 = CanvasHydratorTest 单值门用例平移) ───
+
+// singleImageCanvas 单独立图片图层画布(与 PHP 导出端 singleImageCanvas 同构):
+// 资源单值门根上下文聚焦用例
+func singleImageCanvas(expression string) *canvas.Canvas {
+	image := layer.NewImageLayer(layer.WithSize(60, 60))
+	image.SetExpression(expression)
+	return canvas.New(320, 100, image)
+}
+
+// singleImageTemplateTable 单图片格模板表(与 PHP 导出端 singleImageTemplateTable 同构):
+// 资源单值门行上下文聚焦用例
+func singleImageTemplateTable(expression string) *layer.TableLayer {
+	content := layer.NewImageLayer(layer.WithSize(160, 40))
+	content.SetExpression(expression)
+	cell := layer.NewTableCellLayer(layer.WithSize(160, 40))
+	cell.AddTemplateContentLayer(content)
+	template := layer.NewTableRowTemplate(layer.WithAutoHeight())
+	template.AddCell(cell)
+	table := layer.NewTableLayer(layer.WithSize(320, 200))
+	table.SetRowsPath("items")
+	table.SetTemplate(template)
+	return table
+}
+
+func TestResourceSingleBarePathIsLegal(t *testing.T) {
+	// 合法形态:恰一个 {{...}} 闭合片段 + 裸点路径,根上下文放行
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(
+		singleImageCanvas("{{orderNo}}"), map[string]any{"orderNo": "A2026-001"})
+	if err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+	image := hydrated.GetLayers()[0].(*layer.ImageLayer)
+	if got := *image.Image(); got != "A2026-001" {
+		t.Errorf("图片 = %q, want A2026-001", got)
+	}
+	if image.Graph().Data.Expression != nil {
+		t.Error("求值后 expression 键必须移除(Image/Qr 条件写键)")
+	}
+}
+
+func TestResourceRootEscapePathIsLegal(t *testing.T) {
+	// 合法形态:$root. 前缀同为裸点路径
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(
+		singleImageCanvas("{{$root.orderNo}}"), map[string]any{"orderNo": "A2026-001"})
+	if err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+	if got := *hydrated.GetLayers()[0].(*layer.ImageLayer).Image(); got != "A2026-001" {
+		t.Errorf("图片 = %q, want A2026-001", got)
+	}
+}
+
+func TestResourceTrailingNewlineToleratedLikePcreDollar(t *testing.T) {
+	// PCRE $ 锚(无 D 修饰符)容忍串尾恰一个换行:PHP 权威端实证 {{orderNo}}\n
+	// 门放行(trim 吸收),求值后片段外尾换行按字面直通(值面宽松,双端同判)——
+	// \n\n 与 \r\n 两形态仍由违例表拦截
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(
+		singleImageCanvas("{{orderNo}}\n"), map[string]any{"orderNo": "A2026-001"})
+	if err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+	if got := *hydrated.GetLayers()[0].(*layer.ImageLayer).Image(); got != "A2026-001\n" {
+		t.Errorf("图片 = %q, want A2026-001\\n(尾换行字面直通,PHP 同判)", got)
+	}
+}
+
+func TestResourceIndexPathLegalInRowContext(t *testing.T) {
+	// 合法形态:$index 保留名(行上下文,自 1 起)
+	ds := map[string]any{"items": []any{map[string]any{"x": 1}, map[string]any{"x": 2}}}
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(
+		canvas.New(320, 400, singleImageTemplateTable("{{$index}}")), ds)
+	if err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+	rows := firstTable(t, hydrated).Rows()
+	if got := *rows[0].Cells()[0].ContentLayer().(*layer.ImageLayer).Image(); got != "1" {
+		t.Errorf("行 1 图片 = %q, want 1", got)
+	}
+	if got := *rows[1].Cells()[0].ContentLayer().(*layer.ImageLayer).Image(); got != "2" {
+		t.Errorf("行 2 图片 = %q, want 2", got)
+	}
+}
+
+func TestResourceExpressionViolationFailsFast(t *testing.T) {
+	// 五类违例形态 + 边角(纯空白片段/未闭合片段)
+	cases := []struct{ name, expression string }{
+		{"多片段拼接", "{{orderNo}}{{orderNo}}"},
+		{"片段外字面（尾缀）", "{{orderNo}}.png"},
+		{"片段外字面（前缀）", "https://cdn/{{orderNo}}"},
+		{"函数调用", "{{number(orderNo, 2)}}"},
+		{"空片段", "{{}}"},
+		{"纯空白片段", "{{  }}"},
+		{"未闭合片段", "{{orderNo"},
+		{"片段外字面 + 双换行尾缀", "{{orderNo}}\n\n"},
+		{"片段外字面 + CRLF 尾缀", "{{orderNo}}\r\n"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := hydrate.NewHydrator(nil).Hydrate(singleImageCanvas(tc.expression), dataset())
+			if !errors.Is(err, hydrate.ErrExpressionSingleResourceRef) {
+				t.Fatalf("资源表达式「%s」违例必须报 ErrExpressionSingleResourceRef, got %v", tc.expression, err)
+			}
+		})
+	}
+}
+
+func TestResourceViolationPrecedesEmptyResourceCheck(t *testing.T) {
+	// 顺序钉定:校验在求值前——违例形态即使求值必空也报 single_ref,而非 empty_resource
+	_, err := hydrate.NewHydrator(nil).Hydrate(
+		singleImageCanvas("{{missing}}.png"), map[string]any{"orderNo": "A"})
+	if !errors.Is(err, hydrate.ErrExpressionSingleResourceRef) {
+		t.Fatalf("错误 = %v, want ErrExpressionSingleResourceRef(先于 empty_resource)", err)
+	}
+}
+
+func TestQrCodeViolationFailsFast(t *testing.T) {
+	// 二维码静默错编是该门的首要防线(渲染零报错、扫码才暴露的实测缺陷)
+	qr := layer.NewQrCodeLayer(layer.WithSize(60, 60))
+	qr.SetExpression("{{orderNo}}-qr")
+	_, err := hydrate.NewHydrator(nil).Hydrate(canvas.New(320, 100, qr), dataset())
+	if !errors.Is(err, hydrate.ErrExpressionSingleResourceRef) {
+		t.Fatalf("错误 = %v, want ErrExpressionSingleResourceRef", err)
+	}
+}
+
+func TestTextLayerInterpolationUnchangedBySingleRefGate(t *testing.T) {
+	// 门只管资源两类:文本层多片段拼接 + 字面混排照旧插值(spec 裁决 3:插值语义不动)
+	text := layer.NewTextLayer(layer.WithSize(200, 30), layer.WithFont("", 12, "#000"))
+	text.SetExpression("单号 {{orderNo}} 与 {{orderNo}}")
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(
+		canvas.New(320, 100, text), map[string]any{"orderNo": "A2026-001"})
+	if err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+	if got := hydrated.GetLayers()[0].(*layer.TextLayer).Text(); got != "单号 A2026-001 与 A2026-001" {
+		t.Errorf("文本 = %q, want 单号 A2026-001 与 A2026-001", got)
 	}
 }
 

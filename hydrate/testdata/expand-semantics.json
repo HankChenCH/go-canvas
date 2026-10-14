@@ -8,6 +8,7 @@
             "解码期错误（template_rows_conflict/rows_path_missing）与填充期错误同管线表达，expect = {graph} | {errorCode}（spec §5.2）；",
             "dataset null = 未绑数据集恒等直通（含模板表）；无标记无模板画布恒等直通；",
             "填充产物 graph 已含 V1 高度耦合重放结果（行高定稿/固定格内容压平），填充永不回写源 graph；",
+            "资源表达式单值门（ADR 0020）：已标记 Image/Qr 的 expression 必须恰为一个 {{...}} 闭合片段 + 裸点路径（$index/$root. 前缀合法），违例 errorCode expression_resource_single_ref，校验先于求值与 empty_resource 空串检查；",
             "再生成: go-canvas 仓 make hydrate-fixtures（需本机 PHP 8.3）"
         ]
     },
@@ -1147,7 +1148,7 @@
         },
         {
             "name": "independent-layers-root-context",
-            "description": "独立图层（非行循环）根上下文求值：全绑定面 Text/Image/Qr",
+            "description": "独立图层（非行循环）根上下文求值：全绑定面 Text/Image/Qr；资源两类表达式为单值裸路径（ADR 0020 单值门合法形态，$root. 前缀放行）",
             "graph": {
                 "canvas": {
                     "width": 320,
@@ -1237,8 +1238,8 @@
                         },
                         "data": {
                             "valueType": "ExpressionValue",
-                            "expression": "{{orderNo}}.png",
-                            "value": "{{orderNo}}.png"
+                            "expression": "{{orderNo}}",
+                            "value": "{{orderNo}}"
                         }
                     },
                     {
@@ -1277,8 +1278,8 @@
                         },
                         "data": {
                             "valueType": "ExpressionValue",
-                            "expression": "{{orderNo}}-qr",
-                            "value": "{{orderNo}}-qr"
+                            "expression": "{{$root.orderNo}}",
+                            "value": "{{$root.orderNo}}"
                         }
                     }
                 ]
@@ -1388,7 +1389,7 @@
                             },
                             "data": {
                                 "valueType": "StaticValue",
-                                "value": "A2026-001.png"
+                                "value": "A2026-001"
                             }
                         },
                         {
@@ -1427,7 +1428,7 @@
                             },
                             "data": {
                                 "valueType": "StaticValue",
-                                "value": "A2026-001-qr"
+                                "value": "A2026-001"
                             }
                         }
                     ]
@@ -4255,7 +4256,7 @@
         },
         {
             "name": "empty-resource-expression",
-            "description": "资源类字段（Image src）求值空串 = 报错（空 URL 无意义，fail-fast 优于错误后移到物化）",
+            "description": "资源类字段（Image src）语法合法单路径但求值空串 = 报错（单值门放行后落 empty_resource：空 URL 无意义，fail-fast 优于错误后移到物化）",
             "graph": {
                 "canvas": {
                     "width": 320,
@@ -4507,6 +4508,945 @@
             },
             "expect": {
                 "errorCode": "expression_empty_resource"
+            }
+        },
+        {
+            "name": "resource-single-bare-path-legal",
+            "description": "资源单值门（ADR 0020）合法形态：恰一个 {{...}} 闭合片段 + 裸点路径，正常求值并解除标记",
+            "graph": {
+                "canvas": {
+                    "width": 320,
+                    "height": 100
+                },
+                "layers": [
+                    {
+                        "type": "ImageLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 60,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            }
+                        },
+                        "data": {
+                            "valueType": "ExpressionValue",
+                            "expression": "{{orderNo}}",
+                            "value": "{{orderNo}}"
+                        }
+                    }
+                ]
+            },
+            "dataset": {
+                "orderNo": "A2026-001"
+            },
+            "expect": {
+                "graph": {
+                    "canvas": {
+                        "width": 320,
+                        "height": 100
+                    },
+                    "layers": [
+                        {
+                            "type": "ImageLayer",
+                            "priority": 0,
+                            "spec": {
+                                "shape": {
+                                    "width": 60,
+                                    "height": 60,
+                                    "autoWidth": false,
+                                    "autoHeight": false,
+                                    "lineHeight": 1,
+                                    "padding": {
+                                        "top": 0,
+                                        "bottom": 0,
+                                        "left": 0,
+                                        "right": 0
+                                    },
+                                    "border": {
+                                        "top": null,
+                                        "bottom": null,
+                                        "left": null,
+                                        "right": null
+                                    },
+                                    "backgroundColor": null
+                                },
+                                "align": {
+                                    "horizontal": "center",
+                                    "vertical": "center"
+                                },
+                                "position": {
+                                    "x": 0,
+                                    "y": 0,
+                                    "position": "top-left"
+                                }
+                            },
+                            "data": {
+                                "valueType": "StaticValue",
+                                "value": "A2026-001"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "resource-root-escape-path-legal",
+            "description": "资源单值门合法形态：$root. 前缀同为裸点路径",
+            "graph": {
+                "canvas": {
+                    "width": 320,
+                    "height": 100
+                },
+                "layers": [
+                    {
+                        "type": "ImageLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 60,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            }
+                        },
+                        "data": {
+                            "valueType": "ExpressionValue",
+                            "expression": "{{$root.orderNo}}",
+                            "value": "{{$root.orderNo}}"
+                        }
+                    }
+                ]
+            },
+            "dataset": {
+                "orderNo": "A2026-001"
+            },
+            "expect": {
+                "graph": {
+                    "canvas": {
+                        "width": 320,
+                        "height": 100
+                    },
+                    "layers": [
+                        {
+                            "type": "ImageLayer",
+                            "priority": 0,
+                            "spec": {
+                                "shape": {
+                                    "width": 60,
+                                    "height": 60,
+                                    "autoWidth": false,
+                                    "autoHeight": false,
+                                    "lineHeight": 1,
+                                    "padding": {
+                                        "top": 0,
+                                        "bottom": 0,
+                                        "left": 0,
+                                        "right": 0
+                                    },
+                                    "border": {
+                                        "top": null,
+                                        "bottom": null,
+                                        "left": null,
+                                        "right": null
+                                    },
+                                    "backgroundColor": null
+                                },
+                                "align": {
+                                    "horizontal": "center",
+                                    "vertical": "center"
+                                },
+                                "position": {
+                                    "x": 0,
+                                    "y": 0,
+                                    "position": "top-left"
+                                }
+                            },
+                            "data": {
+                                "valueType": "StaticValue",
+                                "value": "A2026-001"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "resource-index-path-legal-row-context",
+            "description": "资源单值门合法形态：$index 保留名（行上下文，自 1 起）",
+            "graph": {
+                "canvas": {
+                    "width": 320,
+                    "height": 400
+                },
+                "layers": [
+                    {
+                        "type": "TableLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 320,
+                                "height": 200,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "left",
+                                "vertical": "top"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            }
+                        },
+                        "data": {
+                            "rowsPath": "items"
+                        },
+                        "template": {
+                            "type": "TableRowTemplate",
+                            "priority": 0,
+                            "spec": {
+                                "shape": {
+                                    "width": 320,
+                                    "height": 40,
+                                    "autoWidth": false,
+                                    "autoHeight": false,
+                                    "lineHeight": 1,
+                                    "padding": {
+                                        "top": 0,
+                                        "bottom": 0,
+                                        "left": 0,
+                                        "right": 0
+                                    },
+                                    "border": {
+                                        "top": null,
+                                        "bottom": null,
+                                        "left": null,
+                                        "right": null
+                                    },
+                                    "backgroundColor": null
+                                },
+                                "align": {
+                                    "horizontal": "left",
+                                    "vertical": "top"
+                                },
+                                "position": {
+                                    "x": 0,
+                                    "y": 0,
+                                    "position": "top-left"
+                                }
+                            },
+                            "cells": [
+                                {
+                                    "type": "TableCellLayer",
+                                    "priority": 0,
+                                    "spec": {
+                                        "shape": {
+                                            "width": 160,
+                                            "height": 40,
+                                            "autoWidth": false,
+                                            "autoHeight": false,
+                                            "lineHeight": 1,
+                                            "padding": {
+                                                "top": 0,
+                                                "bottom": 0,
+                                                "left": 0,
+                                                "right": 0
+                                            },
+                                            "border": {
+                                                "top": null,
+                                                "bottom": null,
+                                                "left": null,
+                                                "right": null
+                                            },
+                                            "backgroundColor": null
+                                        },
+                                        "align": {
+                                            "horizontal": "left",
+                                            "vertical": "top"
+                                        },
+                                        "position": {
+                                            "x": 0,
+                                            "y": 0,
+                                            "position": "top-left"
+                                        }
+                                    },
+                                    "content": {
+                                        "type": "ImageLayer",
+                                        "priority": 0,
+                                        "spec": {
+                                            "shape": {
+                                                "width": 160,
+                                                "height": 40,
+                                                "autoWidth": false,
+                                                "autoHeight": false,
+                                                "lineHeight": 1,
+                                                "padding": {
+                                                    "top": 0,
+                                                    "bottom": 0,
+                                                    "left": 0,
+                                                    "right": 0
+                                                },
+                                                "border": {
+                                                    "top": null,
+                                                    "bottom": null,
+                                                    "left": null,
+                                                    "right": null
+                                                },
+                                                "backgroundColor": null
+                                            },
+                                            "align": {
+                                                "horizontal": "center",
+                                                "vertical": "center"
+                                            },
+                                            "position": {
+                                                "x": 0,
+                                                "y": 0,
+                                                "position": "top-left"
+                                            }
+                                        },
+                                        "data": {
+                                            "valueType": "ExpressionValue",
+                                            "expression": "{{$index}}",
+                                            "value": "{{$index}}"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "dataset": {
+                "items": [
+                    {
+                        "x": 1
+                    },
+                    {
+                        "x": 2
+                    }
+                ]
+            },
+            "expect": {
+                "graph": {
+                    "canvas": {
+                        "width": 320,
+                        "height": 400
+                    },
+                    "layers": [
+                        {
+                            "type": "TableLayer",
+                            "priority": 0,
+                            "spec": {
+                                "shape": {
+                                    "width": 320,
+                                    "height": 200,
+                                    "autoWidth": false,
+                                    "autoHeight": false,
+                                    "lineHeight": 1,
+                                    "padding": {
+                                        "top": 0,
+                                        "bottom": 0,
+                                        "left": 0,
+                                        "right": 0
+                                    },
+                                    "border": {
+                                        "top": null,
+                                        "bottom": null,
+                                        "left": null,
+                                        "right": null
+                                    },
+                                    "backgroundColor": null
+                                },
+                                "align": {
+                                    "horizontal": "left",
+                                    "vertical": "top"
+                                },
+                                "position": {
+                                    "x": 0,
+                                    "y": 0,
+                                    "position": "top-left"
+                                }
+                            },
+                            "rows": [
+                                {
+                                    "type": "TableRowLayer",
+                                    "priority": 0,
+                                    "spec": {
+                                        "shape": {
+                                            "width": 320,
+                                            "height": 40,
+                                            "autoWidth": false,
+                                            "autoHeight": false,
+                                            "lineHeight": 1,
+                                            "padding": {
+                                                "top": 0,
+                                                "bottom": 0,
+                                                "left": 0,
+                                                "right": 0
+                                            },
+                                            "border": {
+                                                "top": null,
+                                                "bottom": null,
+                                                "left": null,
+                                                "right": null
+                                            },
+                                            "backgroundColor": null
+                                        },
+                                        "align": {
+                                            "horizontal": "left",
+                                            "vertical": "top"
+                                        },
+                                        "position": {
+                                            "x": 0,
+                                            "y": 0,
+                                            "position": "top-left"
+                                        }
+                                    },
+                                    "cells": [
+                                        {
+                                            "type": "TableCellLayer",
+                                            "priority": 0,
+                                            "spec": {
+                                                "shape": {
+                                                    "width": 160,
+                                                    "height": 40,
+                                                    "autoWidth": false,
+                                                    "autoHeight": false,
+                                                    "lineHeight": 1,
+                                                    "padding": {
+                                                        "top": 0,
+                                                        "bottom": 0,
+                                                        "left": 0,
+                                                        "right": 0
+                                                    },
+                                                    "border": {
+                                                        "top": null,
+                                                        "bottom": null,
+                                                        "left": null,
+                                                        "right": null
+                                                    },
+                                                    "backgroundColor": null
+                                                },
+                                                "align": {
+                                                    "horizontal": "left",
+                                                    "vertical": "top"
+                                                },
+                                                "position": {
+                                                    "x": 0,
+                                                    "y": 0,
+                                                    "position": "top-left"
+                                                }
+                                            },
+                                            "content": {
+                                                "type": "ImageLayer",
+                                                "priority": 0,
+                                                "spec": {
+                                                    "shape": {
+                                                        "width": 160,
+                                                        "height": 40,
+                                                        "autoWidth": false,
+                                                        "autoHeight": false,
+                                                        "lineHeight": 1,
+                                                        "padding": {
+                                                            "top": 0,
+                                                            "bottom": 0,
+                                                            "left": 0,
+                                                            "right": 0
+                                                        },
+                                                        "border": {
+                                                            "top": null,
+                                                            "bottom": null,
+                                                            "left": null,
+                                                            "right": null
+                                                        },
+                                                        "backgroundColor": null
+                                                    },
+                                                    "align": {
+                                                        "horizontal": "center",
+                                                        "vertical": "center"
+                                                    },
+                                                    "position": {
+                                                        "x": 0,
+                                                        "y": 0,
+                                                        "position": "top-left"
+                                                    }
+                                                },
+                                                "data": {
+                                                    "valueType": "StaticValue",
+                                                    "value": "1"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "TableRowLayer",
+                                    "priority": 0,
+                                    "spec": {
+                                        "shape": {
+                                            "width": 320,
+                                            "height": 40,
+                                            "autoWidth": false,
+                                            "autoHeight": false,
+                                            "lineHeight": 1,
+                                            "padding": {
+                                                "top": 0,
+                                                "bottom": 0,
+                                                "left": 0,
+                                                "right": 0
+                                            },
+                                            "border": {
+                                                "top": null,
+                                                "bottom": null,
+                                                "left": null,
+                                                "right": null
+                                            },
+                                            "backgroundColor": null
+                                        },
+                                        "align": {
+                                            "horizontal": "left",
+                                            "vertical": "top"
+                                        },
+                                        "position": {
+                                            "x": 0,
+                                            "y": 0,
+                                            "position": "top-left"
+                                        }
+                                    },
+                                    "cells": [
+                                        {
+                                            "type": "TableCellLayer",
+                                            "priority": 0,
+                                            "spec": {
+                                                "shape": {
+                                                    "width": 160,
+                                                    "height": 40,
+                                                    "autoWidth": false,
+                                                    "autoHeight": false,
+                                                    "lineHeight": 1,
+                                                    "padding": {
+                                                        "top": 0,
+                                                        "bottom": 0,
+                                                        "left": 0,
+                                                        "right": 0
+                                                    },
+                                                    "border": {
+                                                        "top": null,
+                                                        "bottom": null,
+                                                        "left": null,
+                                                        "right": null
+                                                    },
+                                                    "backgroundColor": null
+                                                },
+                                                "align": {
+                                                    "horizontal": "left",
+                                                    "vertical": "top"
+                                                },
+                                                "position": {
+                                                    "x": 0,
+                                                    "y": 0,
+                                                    "position": "top-left"
+                                                }
+                                            },
+                                            "content": {
+                                                "type": "ImageLayer",
+                                                "priority": 0,
+                                                "spec": {
+                                                    "shape": {
+                                                        "width": 160,
+                                                        "height": 40,
+                                                        "autoWidth": false,
+                                                        "autoHeight": false,
+                                                        "lineHeight": 1,
+                                                        "padding": {
+                                                            "top": 0,
+                                                            "bottom": 0,
+                                                            "left": 0,
+                                                            "right": 0
+                                                        },
+                                                        "border": {
+                                                            "top": null,
+                                                            "bottom": null,
+                                                            "left": null,
+                                                            "right": null
+                                                        },
+                                                        "backgroundColor": null
+                                                    },
+                                                    "align": {
+                                                        "horizontal": "center",
+                                                        "vertical": "center"
+                                                    },
+                                                    "position": {
+                                                        "x": 0,
+                                                        "y": 0,
+                                                        "position": "top-left"
+                                                    }
+                                                },
+                                                "data": {
+                                                    "valueType": "StaticValue",
+                                                    "value": "2"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "resource-multi-fragment-violation",
+            "description": "资源单值门违例：多片段拼接（文本插值语义在资源面废除，求值端 fail-fast）",
+            "graph": {
+                "canvas": {
+                    "width": 320,
+                    "height": 100
+                },
+                "layers": [
+                    {
+                        "type": "ImageLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 60,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            }
+                        },
+                        "data": {
+                            "valueType": "ExpressionValue",
+                            "expression": "{{orderNo}}{{orderNo}}",
+                            "value": "{{orderNo}}{{orderNo}}"
+                        }
+                    }
+                ]
+            },
+            "dataset": {
+                "orderNo": "A2026-001"
+            },
+            "expect": {
+                "errorCode": "expression_resource_single_ref"
+            }
+        },
+        {
+            "name": "resource-literal-outside-violation",
+            "description": "资源单值门违例：片段外字面（存量拼接 URL 形态再渲染 fail-fast，0.x 契约窗口接受）",
+            "graph": {
+                "canvas": {
+                    "width": 320,
+                    "height": 100
+                },
+                "layers": [
+                    {
+                        "type": "ImageLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 60,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            }
+                        },
+                        "data": {
+                            "valueType": "ExpressionValue",
+                            "expression": "{{orderNo}}.png",
+                            "value": "{{orderNo}}.png"
+                        }
+                    }
+                ]
+            },
+            "dataset": {
+                "orderNo": "A2026-001"
+            },
+            "expect": {
+                "errorCode": "expression_resource_single_ref"
+            }
+        },
+        {
+            "name": "resource-function-call-violation",
+            "description": "资源单值门违例：内建函数调用（格式化标量不是数据端备好的资源引用）",
+            "graph": {
+                "canvas": {
+                    "width": 320,
+                    "height": 100
+                },
+                "layers": [
+                    {
+                        "type": "ImageLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 60,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            }
+                        },
+                        "data": {
+                            "valueType": "ExpressionValue",
+                            "expression": "{{number(orderNo, 2)}}",
+                            "value": "{{number(orderNo, 2)}}"
+                        }
+                    }
+                ]
+            },
+            "dataset": {
+                "orderNo": "A2026-001"
+            },
+            "expect": {
+                "errorCode": "expression_resource_single_ref"
+            }
+        },
+        {
+            "name": "resource-empty-fragment-violation",
+            "description": "资源单值门违例：空片段（门先于求值器，不落 expression_syntax_error）",
+            "graph": {
+                "canvas": {
+                    "width": 320,
+                    "height": 100
+                },
+                "layers": [
+                    {
+                        "type": "ImageLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 60,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            }
+                        },
+                        "data": {
+                            "valueType": "ExpressionValue",
+                            "expression": "{{}}",
+                            "value": "{{}}"
+                        }
+                    }
+                ]
+            },
+            "dataset": {
+                "orderNo": "A2026-001"
+            },
+            "expect": {
+                "errorCode": "expression_resource_single_ref"
+            }
+        },
+        {
+            "name": "resource-violation-precedes-empty-check",
+            "description": "顺序钉定：校验在求值前——违例形态即使求值必空也报 single_ref 而非 empty_resource",
+            "graph": {
+                "canvas": {
+                    "width": 320,
+                    "height": 100
+                },
+                "layers": [
+                    {
+                        "type": "ImageLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 60,
+                                "height": 60,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            }
+                        },
+                        "data": {
+                            "valueType": "ExpressionValue",
+                            "expression": "{{missing}}.png",
+                            "value": "{{missing}}.png"
+                        }
+                    }
+                ]
+            },
+            "dataset": {
+                "orderNo": "A"
+            },
+            "expect": {
+                "errorCode": "expression_resource_single_ref"
             }
         },
         {

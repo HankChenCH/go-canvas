@@ -22,15 +22,16 @@ import (
 // hydrateErrorCodes 稳定 code → sentinel 映射(跨包汇总解码期与填充期;
 // fixture errorCode 字符串经它对位 errors.Is)
 var hydrateErrorCodes = map[string]error{
-	"unknown_layer_type":          layer.ErrUnknownLayerType,
-	"template_rows_conflict":      layer.ErrTemplateRowsConflict,
-	"rows_path_missing":           layer.ErrRowsPathMissing,
-	"rows_path_invalid":           hydrate.ErrRowsPathInvalid,
-	"expression_row_outside_loop": hydrate.ErrExpressionRowOutsideLoop,
-	"reserved_root_key":           hydrate.ErrReservedRootKey,
-	"expression_empty_resource":   hydrate.ErrExpressionEmptyResource,
-	"expression_type_mismatch":    hydrate.ErrExpressionTypeMismatch,
-	"expression_syntax_error":     hydrate.ErrExpressionSyntaxError,
+	"unknown_layer_type":             layer.ErrUnknownLayerType,
+	"template_rows_conflict":         layer.ErrTemplateRowsConflict,
+	"rows_path_missing":              layer.ErrRowsPathMissing,
+	"rows_path_invalid":              hydrate.ErrRowsPathInvalid,
+	"expression_row_outside_loop":    hydrate.ErrExpressionRowOutsideLoop,
+	"reserved_root_key":              hydrate.ErrReservedRootKey,
+	"expression_empty_resource":      hydrate.ErrExpressionEmptyResource,
+	"expression_resource_single_ref": hydrate.ErrExpressionSingleResourceRef,
+	"expression_type_mismatch":       hydrate.ErrExpressionTypeMismatch,
+	"expression_syntax_error":        hydrate.ErrExpressionSyntaxError,
 }
 
 // fixtureErrorCode 定位错误对应的稳定 code;不在 code 集内的错误直接失败
