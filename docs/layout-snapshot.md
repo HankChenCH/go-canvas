@@ -45,6 +45,7 @@ add 副作用)。导出脚本把用例重放一次(`Canvas::fromGraph($canvas->g
 | `anchors-containers` | 九锚点摆位、负偏移溢出、priority 渲染次序、表格嵌套(行堆叠/单元格横排/嵌套表/auto 高度传播) |
 | `table-template-wire` | TableLayer V2 模板态 wire:template 键、data.rowsPath、表达式标记三键/两键形态 |
 | `name-visible-contract` | 图层 name/visible 契约(layer-panel-ux 工单 01):name 仅非空写键、visible 仅 false 写键、hidden 根层渲染跳过(零绘制记录) |
+| `image-fit-wire` | 图片层适配模式 fit wire parity(ADR 0023,go-canvas 工票 03):spec.fit 条件写键——缺省整键不落、contain 落键殿后 spec 末位、未知枚举串透传、fit 与表达式标记正交;空引用层零物化只画盒,contain 收缩几何属渲染臂由双端单测锁定 |
 
 **emoji 只用单码点字素**:`Uax14LineBreaker` 以字素簇为最小单元,本机 PHP 有 ext-intl
 (字素簇切分),Go 核心默认码点切分——ZWJ 组合序列在两条默认切分路径下断行不同。该差异

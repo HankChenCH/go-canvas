@@ -1,7 +1,17 @@
 package layer
 
+import "math"
+
 // ImageLayer 图片图层:只记录资源原始引用(URL 或本地路径),
 // 下载与物化由渲染前的 ResourceResolver 统一完成——构造与 setter 不做任何 I/O。
+
+// 适配模式取值(ADR 0023):cover 铺满裁切(缺省)= 等比缩放铺满内容盒、溢出居中裁切;
+// contain 完整显示 = 等比缩放至恰好完整落入内容盒、按对齐放置,空隙透明。
+// v1 已知值仅 contain;未知值宽容保存(渲染面按 cover 降级,白名单在渲染臂)
+const (
+	FitCover   = "cover"
+	FitContain = "contain"
+)
 
 // ImageLayer 图片图层
 type ImageLayer struct {
@@ -9,7 +19,10 @@ type ImageLayer struct {
 	rawImg *string
 	// expression 数据表达式标记(TableLayer V2,spec §3.1):非 nil = 已标记,
 	// value 载体(rawImg)恒镜像表达式原文;字面 setter 解除标记
-	expression  *string
+	expression *string
+	// fit 适配模式声明(ADR 0023):静态声明不参与数据表达式,只影响绘制、
+	// 不影响盒子布局;空串 = cover 缺省,未知值原样透传
+	fit         string
 	resolvedSrc *string
 }
 
@@ -56,6 +69,18 @@ func (l *ImageLayer) SetResolvedSrc(src string) {
 	l.resolvedSrc = &src
 }
 
+// SetFit 声明适配模式(ADR 0023):与 src 正交(改图/打标/解标均不扰动);
+// cover 显式声明归一空串缺省态,保条件写键字节面(name="" 先例)
+func (l *ImageLayer) SetFit(fit string) {
+	if fit == FitCover {
+		fit = ""
+	}
+	l.fit = fit
+}
+
+// Fit 适配模式声明原文;空串 = cover 缺省(渲染面未知值按 cover 降级,白名单在渲染臂)
+func (l *ImageLayer) Fit() string { return l.fit }
+
 // ResolvedSrc 渲染实际可用的图片来源:优先物化结果,回退原始引用
 func (l *ImageLayer) ResolvedSrc() *string {
 	if l.resolvedSrc != nil {
@@ -68,34 +93,58 @@ func (l *ImageLayer) ResolvedSrc() *string {
 // left/top 臂取 padding,center/贴边臂按宽高差)。纯布局计算,渲染端共用;
 // 未知取值归 0(PHP match default 臂);整除向零截断,对齐 PHP intval
 func (l *ImageLayer) ImageOrigin() (int, int) {
-	posx := 0
+	return l.alignedX(l.ContentWidth()), l.alignedY(l.ContentHeight())
+}
+
+// ContainRect contain 收缩矩形(ADR 0023):按源图内在比例把内容盒收缩成等比矩形——
+// 两维同一缩放系数取 min(内容宽比, 内容高比),长边贴内容盒;放置按对齐 + padding
+// 与 ImageOrigin 同门公式。纯布局计算,渲染端共用;内在尺寸由调用方读取
+// (读取失败按 cover 走),非法尺寸(≤0)不进本函数,收缩结果 ≤0 由后端
+// DrawImage 防护只画盒
+func (l *ImageLayer) ContainRect(imgWidth, imgHeight int) (int, int, int, int) {
+	scale := math.Min(float64(l.ContentWidth())/float64(imgWidth), float64(l.ContentHeight())/float64(imgHeight))
+	width := int(float64(imgWidth) * scale)
+	height := int(float64(imgHeight) * scale)
+	return l.alignedX(width), l.alignedY(height), width, height
+}
+
+// alignedX 对齐放置横向公式(align + padding 同门):placedWidth 尺寸的内容在
+// 整盒内的起点——left 臂取 padding、center/贴边臂按整盒宽差(不取内容盒,
+// PHP alignedX 同款);未知取值归 0,整除向零截断对齐 PHP intval
+func (l *ImageLayer) alignedX(placedWidth int) int {
 	switch l.horizontalAlign {
 	case AlignLeft:
-		posx = int(l.padding.Left)
+		return int(l.padding.Left)
 	case AlignCenter:
-		posx = (l.Width() - l.ContentWidth()) / 2
+		return (l.Width() - placedWidth) / 2
 	case AlignRight:
-		posx = l.Width() - l.ContentWidth()
+		return l.Width() - placedWidth
+	default:
+		return 0
 	}
+}
 
-	posy := 0
+// alignedY 对齐放置纵向公式:与 alignedX 同门镜像
+func (l *ImageLayer) alignedY(placedHeight int) int {
 	switch l.verticalAlign {
 	case AlignTop:
-		posy = int(l.padding.Top)
+		return int(l.padding.Top)
 	case AlignCenter:
-		posy = (l.Height() - l.ContentHeight()) / 2
+		return (l.Height() - placedHeight) / 2
 	case AlignBottom:
-		posy = l.Height() - l.ContentHeight()
+		return l.Height() - placedHeight
+	default:
+		return 0
 	}
-
-	return posx, posy
 }
 
 // TypeName implements Layer
 func (l *ImageLayer) TypeName() string { return TypeImage }
 
 // Graph 序列化为 wire 节点;data 条件写键:标记态三键(ExpressionValue),
-// 未标记两键(StaticValue,无 expression 键)——保 Go↔PHP 字节 parity
+// 未标记两键(StaticValue,无 expression 键);fit 条件写键(ADR 0023):
+// 缺省(cover)整键不落、缺省态字节面与无字段版本一致,落键殿后 spec 末位
+// (shape/align/position/fit);未知值原样透传保往返恒等——保 Go↔PHP 字节 parity
 func (l *ImageLayer) Graph() Node {
 	n := l.base.wireNode(TypeImage)
 	if l.expression != nil {
@@ -103,13 +152,21 @@ func (l *ImageLayer) Graph() Node {
 	} else {
 		n.Data = &Data{ValueType: ValueTypeStatic, Value: l.rawImg}
 	}
+	if l.fit != "" {
+		fit := l.fit
+		n.Spec.Fit = &fit
+	}
 	return n
 }
 
-// ImageFromGraph 由 wire 节点重建图片图层(工厂 FromGraph 的图片分支)
+// ImageFromGraph 由 wire 节点重建图片图层(工厂 FromGraph 的图片分支)。
+// fit 宽容读(ADR 0023):无键回填缺省,显式 cover 归一空串,未知值原样透传
 func ImageFromGraph(n Node) *ImageLayer {
 	l := NewImageLayer()
 	l.applyNode(n)
+	if n.Spec.Fit != nil {
+		l.SetFit(*n.Spec.Fit)
+	}
 	if n.Data != nil {
 		if n.Data.ValueType == ValueTypeExpression && n.Data.Expression != nil {
 			l.SetExpression(*n.Data.Expression)

@@ -7,6 +7,14 @@ package renderer
 import (
 	"context"
 	"fmt"
+	"image"
+	"os"
+
+	// 内在尺寸探测按格式注册(ADR 0023 contain 臂):与位图后端解码集一致,
+	// stdlib 三格式——核心 module 纯 stdlib 红线不变,其余格式按读取失败降级 cover
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 
 	"github.com/HankChenCH/go-canvas/canvas"
 	"github.com/HankChenCH/go-canvas/layer"
@@ -224,9 +232,9 @@ func (r *template) paintCell(ctx context.Context, l *layer.TableCellLayer, x, y 
 }
 
 // paintImage 图片图层:绘制分派前按需物化(spec §4.3,失败即抛渲染面丢弃),
-// 先画自身盒,再按内容区对齐起点放置。
-// src 取 ResolvedSrc(物化结果优先,回退原始引用——本地路径零物化直画),
-// 引用为 nil 时只画盒
+// 先画自身盒,再放置图片——contain(ADR 0023)按源图内在比例收缩矩形,cover
+// (缺省/未知值降级/尺寸读取失败)按内容区整铺。src 取 ResolvedSrc(物化结果
+// 优先,回退原始引用——本地路径零物化直画),引用为 nil 时只画盒
 func (r *template) paintImage(ctx context.Context, l *layer.ImageLayer, x, y int) error {
 	if err := r.resolver.ResolveLayer(ctx, l); err != nil {
 		return err
@@ -240,8 +248,35 @@ func (r *template) paintImage(ctx context.Context, l *layer.ImageLayer, x, y int
 		return nil
 	}
 
+	// contain(ADR 0023):白名单在渲染臂——按物化后源图内在比例把目标矩形收缩成
+	// 等比矩形再调原语,原语签名与 cover 语义一字不动;内在尺寸读取失败落 cover 分支,
+	// 损坏图不因 fit 崩分派;未知 fit 值不在白名单,自然落 cover
+	if l.Fit() == layer.FitContain {
+		if cx, cy, cw, ch, ok := containRect(l, *src); ok {
+			return r.backend.DrawImage(*src, x+cx, y+cy, cw, ch)
+		}
+	}
+
 	originX, originY := l.ImageOrigin()
 	return r.backend.DrawImage(*src, x+originX, y+originY, l.ContentWidth(), l.ContentHeight())
+}
+
+// containRect 读物化后源图内在尺寸算收缩矩形。image.DecodeConfig 属绘制分派期 I/O
+// (只读头块,与 resolve 同批语义);打开/解码失败或非法尺寸(≤0)返回 ok=false,
+// 调用方按 cover 走。收缩与放置的纯几何在 layer.ImageLayer.ContainRect
+func containRect(l *layer.ImageLayer, src string) (cx, cy, cw, ch int, ok bool) {
+	f, err := os.Open(src)
+	if err != nil {
+		return 0, 0, 0, 0, false
+	}
+	defer f.Close()
+
+	cfg, _, err := image.DecodeConfig(f)
+	if err != nil || cfg.Width <= 0 || cfg.Height <= 0 {
+		return 0, 0, 0, 0, false
+	}
+	cx, cy, cw, ch = l.ContainRect(cfg.Width, cfg.Height)
+	return cx, cy, cw, ch, true
 }
 
 // paintText 文本图层:绘制分派前按需物化(须先于 Lines()——真实字体度量

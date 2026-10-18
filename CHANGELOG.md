@@ -2,6 +2,12 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## 未发布
+
+- 图片层适配模式 fit 跟随（与 `php-canvas-next` v1.4.0 对等，ADR 0023）：`layer.ImageLayer` 静态声明 `SetFit`/`Fit`（空串 = cover 缺省，显式 cover 归一，未知枚举串宽容透传）、`ContainRect` 纯布局收缩矩形（对齐放置公式抽 `alignedX`/`alignedY` 与 `ImageOrigin` 同源）；wire 条件写键（缺省整键不落、落键殿后 spec 末位 shape/align/position/fit，缺省态字节面与无字段版本一致），hydrate/expand 对 fit 仅透传（独立层与模板表实例化两路径测试锁定）
+- 渲染臂 contain（ADR 0023）：`renderer.paintImage` 白名单在渲染臂——`image.DecodeConfig` 读物化后源图内在尺寸（绘制分派期 I/O，stdlib PNG/JPEG/GIF 注册集）算收缩矩形再调 `DrawImage`，原语签名与 cover 语义一字不动；读取失败/未知值降级 cover，cover 路径零回归
+- 共享 fixture 重导（layout-snapshot 新增 image-fit-wire parity 用例，存量零 diff；expand-semantics 24 用例零 diff）；`image-renderer` 位图后端零改动，补 contain 像素点位断言（空隙透明露下层与盒背景、align + padding 放置、未知值/显式 cover 降级与 cover 点位一致、损坏图渲染结局与 cover 逐位等价）
+
 ## 1.3.0 - 2026-10-18
 
 - 画布背景声明式填充跟随（与 `php-canvas-next` v1.3.0 对等，ADR 0022）：`canvas.CanvasBackground` 纯值对象（color/image 可空分量、空串归缺省、宽容读归一），`Canvas.SetBackground` 空背景与无背景同态；wire 条件写键（两分量皆空整键不落，键序钉死 canvas{width,height,background} / background{color,image}），落键/不落键两态解码 → 再编码往返恒等

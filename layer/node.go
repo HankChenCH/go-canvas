@@ -35,12 +35,19 @@ type Node struct {
 }
 
 // Spec 图层公共规格:形状 / 对齐 / 定位;文本图层追加 fontFamily 键
-// (PHP TextLayer::graph() 在父类 spec 之后写入,键序 shape/align/position/fontFamily)
+// (PHP TextLayer::graph() 在父类 spec 之后写入,键序 shape/align/position/fontFamily);
+// 图片图层追加 fit 键(ADR 0023,条件写键,落键殿后 spec 末位,键序 shape/align/position/fit)
 type Spec struct {
 	Shape      Shape       `json:"shape"`
 	Align      Align       `json:"align"`
 	Position   Position    `json:"position"`
 	FontFamily *FontFamily `json:"fontFamily,omitempty"`
+	// Fit 适配模式声明(ADR 0023):仅图片图层写出;缺省(cover)整键不落——
+	// 缺省态字节面与无字段版本一致(name/visible 先例)。解码宽容:无键回填 cover,
+	// 未知枚举串原样透传保往返恒等(渲染面按 cover 降级,白名单在渲染臂)。
+	// 类型面从严:非字符串值解码报错(PHP is_string 门静默归缺省的同型分歧——
+	// Go wire 全部字段类型化解码,与 priority/width 同纪律,fit 不单独豁免)
+	Fit *string `json:"fit,omitempty"`
 }
 
 // FontFamily 文本字体规格(wire 面仅文本图层携带)。

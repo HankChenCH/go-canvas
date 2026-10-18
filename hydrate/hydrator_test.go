@@ -209,6 +209,93 @@ func TestV1TableMarkedContentEvaluatesAtRootScope(t *testing.T) {
 	}
 }
 
+// TestFitPassesThroughHydrateUntouched fit 是静态声明(ADR 0023):不进求值面与
+// 表达式白名单,随 graph 改写原样透传(平移 PHP testFitPassesThroughHydrateUntouched)
+func TestFitPassesThroughHydrateUntouched(t *testing.T) {
+	marked := layer.NewImageLayer(layer.WithSize(60, 60))
+	marked.SetExpression("{{orderNo}}")
+	marked.SetFit(layer.FitContain)
+	static := layer.NewImageLayer(layer.WithSize(60, 60), layer.WithImage("/tmp/static.png"))
+	static.SetFit("fill")
+
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(
+		canvas.New(320, 100, marked, static), dataset())
+	if err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+
+	graph := hydrated.Graph()
+	layers := hydrated.GetLayers()
+	first := layers[0].(*layer.ImageLayer)
+	if got := *first.Image(); got != "A2026-001" {
+		t.Errorf("独立图片 = %q, want A2026-001", got)
+	}
+	if got := first.Fit(); got != layer.FitContain {
+		t.Errorf("独立图片 Fit() = %q, want contain", got)
+	}
+	if got := graph.Layers[0].Spec.Fit; got == nil || *got != layer.FitContain {
+		t.Errorf("hydrate 后 wire spec.fit = %v, want contain", got)
+	}
+	if got := graph.Layers[0].Data.ValueType; got != layer.ValueTypeStatic {
+		t.Errorf("hydrate 后 data.valueType = %q, want StaticValue(求值结果不落 graph)", got)
+	}
+
+	second := layers[1].(*layer.ImageLayer)
+	if got := second.Fit(); got != "fill" {
+		t.Errorf("静态图片 Fit() = %q, want fill(未知值透传)", got)
+	}
+	if got := graph.Layers[1].Spec.Fit; got == nil || *got != "fill" {
+		t.Errorf("hydrate 后 wire spec.fit = %v, want fill", got)
+	}
+}
+
+// TestFitPassesThroughTemplateInstantiation 模板表实例化路径(expand 语义同门):
+// 模板子树格内容层的 fit 随行实例原样透传(平移 PHP testFitPassesThroughTemplateInstantiation)
+func TestFitPassesThroughTemplateInstantiation(t *testing.T) {
+	content := layer.NewImageLayer(layer.WithSize(160, 40))
+	content.SetExpression("{{row.avatar}}")
+	content.SetFit(layer.FitContain)
+	cell := layer.NewTableCellLayer(layer.WithSize(160, 40))
+	cell.AddTemplateContentLayer(content)
+	row := layer.NewTableRowTemplate(layer.WithSize(0, 40))
+	row.AddCell(cell)
+	table := layer.NewTableLayer(layer.WithSize(320, 100), layer.WithBackground("#fff"))
+	table.SetRowsPath("order.items")
+	table.SetTemplate(row)
+
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(canvas.New(320, 100, table), dataset())
+	if err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+
+	rows := hydrated.GetLayers()[0].(*layer.TableLayer).Rows()
+	if len(rows) != 2 {
+		t.Fatalf("实例化行数 = %d, want 2", len(rows))
+	}
+	for _, rowNode := range rows {
+		image := rowNode.Cells()[0].ContentLayer().(*layer.ImageLayer)
+		if got := image.Fit(); got != layer.FitContain {
+			t.Errorf("行实例 Fit() = %q, want contain", got)
+		}
+	}
+	// wire 面:行实例的 content 载荷(RawMessage)内 spec.fit 原样在场
+	wireRows := hydrated.Graph().Layers[0].Rows
+	if wireRows == nil || len(*wireRows) == 0 {
+		t.Fatalf("hydrate 后 wire 缺 rows")
+	}
+	wireCells := (*wireRows)[0].Cells
+	if wireCells == nil || len(*wireCells) == 0 {
+		t.Fatalf("hydrate 后 wire 行实例缺 cells")
+	}
+	var contentNode layer.Node
+	if err := json.Unmarshal((*wireCells)[0].Content, &contentNode); err != nil {
+		t.Fatalf("解码行实例 content 载荷: %v", err)
+	}
+	if got := contentNode.Spec.Fit; got == nil || *got != layer.FitContain {
+		t.Errorf("行实例 wire content.spec.fit = %v, want contain", got)
+	}
+}
+
 func TestNullDatasetIsIdentityEvenWithBindings(t *testing.T) {
 	// 未绑数据集:不跑求值器,全字面(标记字段按 value 镜像显示原文)
 	source := canvas.New(320, 400, templateTable())

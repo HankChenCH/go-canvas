@@ -2834,6 +2834,215 @@
                     "h": 24
                 }
             ]
+        },
+        {
+            "name": "image-fit-wire",
+            "description": "图片层适配模式 fit wire parity（ADR 0023，go-canvas 工票 03）：spec.fit 条件写键——缺省（cover）整键不落、fit=contain 落键殿后 spec 末位（shape/align/position/fit）、未知枚举串原样透传保往返恒等；fit 与表达式标记正交（三键 data 形态 + spec.fit）。空引用图片层零物化只画盒，contain 收缩几何属渲染臂、由双端各自单测锁定",
+            "graph": {
+                "canvas": {
+                    "width": 240,
+                    "height": 40
+                },
+                "layers": [
+                    {
+                        "type": "ImageLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 40,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 0,
+                                "y": 0,
+                                "position": "top-left"
+                            }
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "value": null
+                        }
+                    },
+                    {
+                        "type": "ImageLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 40,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 60,
+                                "y": 0,
+                                "position": "top-left"
+                            },
+                            "fit": "contain"
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "value": null
+                        }
+                    },
+                    {
+                        "type": "ImageLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 40,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 120,
+                                "y": 0,
+                                "position": "top-left"
+                            },
+                            "fit": "fill"
+                        },
+                        "data": {
+                            "valueType": "StaticValue",
+                            "value": null
+                        }
+                    },
+                    {
+                        "type": "ImageLayer",
+                        "priority": 0,
+                        "spec": {
+                            "shape": {
+                                "width": 40,
+                                "height": 24,
+                                "autoWidth": false,
+                                "autoHeight": false,
+                                "lineHeight": 1,
+                                "padding": {
+                                    "top": 0,
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0
+                                },
+                                "border": {
+                                    "top": null,
+                                    "bottom": null,
+                                    "left": null,
+                                    "right": null
+                                },
+                                "backgroundColor": null
+                            },
+                            "align": {
+                                "horizontal": "center",
+                                "vertical": "center"
+                            },
+                            "position": {
+                                "x": 180,
+                                "y": 0,
+                                "position": "top-left"
+                            },
+                            "fit": "contain"
+                        },
+                        "data": {
+                            "valueType": "ExpressionValue",
+                            "expression": "{{row.photo}}",
+                            "value": "{{row.photo}}"
+                        }
+                    }
+                ]
+            },
+            "records": [
+                {
+                    "op": "rect",
+                    "x": 0,
+                    "y": 0,
+                    "w": 40,
+                    "h": 24
+                },
+                {
+                    "op": "rect",
+                    "x": 60,
+                    "y": 0,
+                    "w": 40,
+                    "h": 24
+                },
+                {
+                    "op": "rect",
+                    "x": 120,
+                    "y": 0,
+                    "w": 40,
+                    "h": 24
+                },
+                {
+                    "op": "rect",
+                    "x": 180,
+                    "y": 0,
+                    "w": 40,
+                    "h": 24
+                },
+                {
+                    "op": "image",
+                    "x": 180,
+                    "y": 0,
+                    "w": 40,
+                    "h": 24
+                }
+            ]
         }
     ]
 }
