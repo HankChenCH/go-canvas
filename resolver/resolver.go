@@ -123,6 +123,20 @@ func WithCacheRoot(dir string) Option {
 	return func(r *ResourceResolver) { r.cacheRoot = dir }
 }
 
+// ResolveBackground 画布级物化入口(画布背景图,ADR 0022):与 ResolveLayer 同语义——
+// 入口检查点、远程引用下载缓存(img_layers 同目录)、本地路径直通;背景不是图层、
+// 无 setter 回写,物化结果以返回值交渲染器,失败即抛稳定 code
+func (r *ResourceResolver) ResolveBackground(ctx context.Context, image string) (string, error) {
+	// 入口检查点(与 ResolveLayer 入口同位,ADR 0008):下载发起前掐断已取消/到期的 ctx
+	if err := CheckContext(ctx); err != nil {
+		return "", err
+	}
+	if !isRemoteURL(image) {
+		return image, nil // 本地路径直接使用
+	}
+	return r.cachedRemoteFile(ctx, "img_layers", image)
+}
+
 // Resolve 物化画布全部图层(按 priority 序),首个错误即中止
 func (r *ResourceResolver) Resolve(ctx context.Context, c *canvas.Canvas) error {
 	for _, l := range c.GetLayers() {

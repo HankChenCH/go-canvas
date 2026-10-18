@@ -92,8 +92,9 @@ func TestBuildSampleArrangesContent(t *testing.T) {
 		t.Fatalf("画布 = %dx%d, want 400x520(V2 模板表 + autoWidth 样例区)", c.Width(), c.Height())
 	}
 
-	// priority 叠加:降序 [白底 11, 头图 10, 标题 5, 段落/表格/二维码/条带/页脚
-	// /autoWidth 样例 4…],等优先级保持插入序
+	// priority 叠加:降序 [头图 10, 标题 5, 段落/表格/二维码/条带/页脚
+	// /autoWidth 样例 4…],等优先级保持插入序;白底已迁画布级 background(ADR 0022),
+	// 图层序不再含垫底白层
 	layers := c.GetLayers()
 	gotTypes := make([]string, 0, len(layers))
 	gotPriorities := make([]int, 0, len(layers))
@@ -101,19 +102,24 @@ func TestBuildSampleArrangesContent(t *testing.T) {
 		gotTypes = append(gotTypes, l.TypeName())
 		gotPriorities = append(gotPriorities, l.Priority())
 	}
-	// V2 段(工票 12):bgV2 垫底 ImageLayer + 模板表 TableLayer;
-	// autoWidth 段(工单 02):末尾两个宽自适应文本层
+	// V2 段(工票 12):模板表 TableLayer;autoWidth 段(工单 02):末尾两个宽自适应文本层
 	wantTypes := []string{
-		layer.TypeImage, layer.TypeImage, layer.TypeImage, layer.TypeText, layer.TypeText,
+		layer.TypeImage, layer.TypeText, layer.TypeText,
 		layer.TypeTable, layer.TypeQrCode, layer.TypeImage, layer.TypeText,
 		layer.TypeTable, layer.TypeText, layer.TypeText,
 	}
-	wantPriorities := []int{11, 11, 10, 5, 4, 4, 4, 4, 4, 4, 4, 4}
+	wantPriorities := []int{10, 5, 4, 4, 4, 4, 4, 4, 4, 4}
 	if !reflect.DeepEqual(gotTypes, wantTypes) {
 		t.Errorf("图层类型序 = %v, want %v", gotTypes, wantTypes)
 	}
 	if !reflect.DeepEqual(gotPriorities, wantPriorities) {
 		t.Errorf("priority 序 = %v, want %v", gotPriorities, wantPriorities)
+	}
+
+	// 白底迁画布级 background(ADR 0022):声明白背景色、无背景图
+	bg := c.Background()
+	if bg == nil || bg.Color == nil || *bg.Color != "#ffffff" || bg.Image != nil {
+		t.Errorf("画布背景 = %+v, want color=#ffffff 无背景图", bg)
 	}
 
 	// 嵌套 auto 高度链:行高取最高单元格(内容行高+padding),表高 = 行高累计。

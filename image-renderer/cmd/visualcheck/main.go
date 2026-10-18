@@ -110,11 +110,6 @@ func pickFont(candidates []string) (string, error) {
 // 品牌字样与二维码内容按 go-canvas 改写,见 docs/visual-check.md 双端对照节)。
 // V2 段 = 声明态模板表(工票 12),经标准管线 Render(hydrate(canvas, dataset)) 出图
 func buildSample(font string) (*canvas.Canvas, map[string]any, error) {
-	// 白色底(最垫底),避免透明区域
-	bg := layer.NewImageLayer(
-		layer.WithSize(400, 400), layer.WithBackground("#ffffff"), layer.WithPriority(11),
-	)
-
 	// 头图色块
 	header := layer.NewImageLayer(
 		layer.WithSize(400, 90), layer.WithBackground("#2d6cdf"),
@@ -188,13 +183,14 @@ func buildSample(font string) (*canvas.Canvas, map[string]any, error) {
 	// V2 模板表(声明态,渲染前经 hydrate(dataset) 实例化)
 	templateTable := buildTemplateTable(font)
 
-	bgV2 := layer.NewImageLayer(
-		layer.WithSize(400, 120), layer.WithBackground("#ffffff"),
-		layer.WithPosition(0, 400), layer.WithPriority(11),
-	)
+	// 画布背景(ADR 0022):白底由画布级 background 声明承担(替代原两块人造白底层),
+	// 先于图层铺装——对齐 php-canvas-image-renderer scripts/visual-check.php 同款换装
+	c := canvas.New(400, 520, header, title, paragraph, table, qrCode, strip, footer,
+		templateTable, autoWidthSingle, autoWidthMultiline)
+	white := "#ffffff"
+	c.SetBackground(canvas.NewCanvasBackground(&white, nil))
 
-	return canvas.New(400, 520, bg, bgV2, header, title, paragraph, table, qrCode, strip, footer,
-		templateTable, autoWidthSingle, autoWidthMultiline), map[string]any{
+	return c, map[string]any{
 		"items": []any{map[string]any{"name": "V2 模板行", "desc": "template × dataset → hydrate → render"}},
 	}, nil
 }

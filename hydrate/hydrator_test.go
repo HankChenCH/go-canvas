@@ -577,3 +577,26 @@ func TestSentinelMessagesCarryCode(t *testing.T) {
 		t.Errorf("错误消息 = %v, want rows_path_invalid 前缀", err)
 	}
 }
+
+func TestBackgroundPassesThroughHydrate(t *testing.T) {
+	// 背景静态(ADR 0022 / spec §3):不进 hydrate 改写面,graph 层改写 + FromGraph
+	// 重建全程透传,分量逐字保留;数据驱动底图走图层级,与背景并存合法
+	c := canvas.New(320, 400, templateTable())
+	color, image := "#ffffff", "https://cdn.example.com/bg.png"
+	c.SetBackground(canvas.NewCanvasBackground(&color, &image))
+
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(c, dataset())
+	if err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+
+	bg := hydrated.Background()
+	if bg == nil || bg.Color == nil || *bg.Color != color || bg.Image == nil || *bg.Image != image {
+		t.Fatalf("hydrate 后背景不符: got %+v, want color=%s image=%s", bg, color, image)
+	}
+	// 再序列化键面:canvas 段 background 键原样透传
+	want := `{"canvas":{"width":320,"height":400,"background":{"color":"#ffffff","image":"https://cdn.example.com/bg.png"}}`
+	if got := jsonOf(t, hydrated.Graph()); !strings.HasPrefix(got, want) {
+		t.Errorf("hydrate 产物 canvas 段背景键不符:\n got  %s\n want 前缀 %s", got, want)
+	}
+}

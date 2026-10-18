@@ -12,6 +12,9 @@ import (
 type Canvas struct {
 	width, height int
 
+	// background 画布背景(ADR 0022):nil = 无背景(wire 整键不落);渲染语义字段,不属图层树
+	background *CanvasBackground
+
 	// layers 按 priority 降序(等优先级保持插入序)
 	layers []layer.Layer
 }
@@ -31,6 +34,18 @@ func (c *Canvas) Width() int { return c.width }
 // Height 画布高
 func (c *Canvas) Height() int { return c.height }
 
+// SetBackground 声明画布背景(ADR 0022,对齐 PHP Canvas::setBackground):
+// nil 或空背景(两分量皆空)与无背景同态——wire 整键不落
+func (c *Canvas) SetBackground(background *CanvasBackground) {
+	if background.IsEmpty() {
+		background = nil
+	}
+	c.background = background
+}
+
+// Background 画布背景;无背景返回 nil
+func (c *Canvas) Background() *CanvasBackground { return c.background }
+
 // AddLayer 追加图层并保持 priority 降序稳定排序
 // (对齐 PHP 8.0+ usort:b.priority <=> a.priority)
 func (c *Canvas) AddLayer(l layer.Layer) {
@@ -48,21 +63,27 @@ func (c *Canvas) GetLayers() []layer.Layer {
 	return out
 }
 
-// Graph 序列化为结构树(无损),可 JSON 持久化、跨渲染端/跨语言复用
+// Graph 序列化为结构树(无损),可 JSON 持久化、跨渲染端/跨语言复用。
+// canvas 段键序钉死 width, height, background(background 条件写键,ADR 0022)
 func (c *Canvas) Graph() Graph {
 	nodes := make([]layer.Node, 0, len(c.layers))
 	for _, l := range c.layers {
 		nodes = append(nodes, l.Graph())
 	}
 	return Graph{
-		Canvas: CanvasSize{Width: c.width, Height: c.height},
+		Canvas: CanvasSize{Width: c.width, Height: c.height, Background: c.background},
 		Layers: nodes,
 	}
 }
 
-// FromGraph 由 graph 结构重建画布(含全部图层,复现插入即排序);未知图层类型报错
+// FromGraph 由 graph 结构重建画布(含全部图层与背景,复现插入即排序);未知图层类型报错。
+// background 宽容读,空背景与无背景同态归一
 func FromGraph(g Graph) (*Canvas, error) {
-	c := &Canvas{width: g.Canvas.Width, height: g.Canvas.Height}
+	background := g.Canvas.Background
+	if background.IsEmpty() {
+		background = nil
+	}
+	c := &Canvas{width: g.Canvas.Width, height: g.Canvas.Height, background: background}
 	for _, n := range g.Layers {
 		l, err := layer.FromGraph(n)
 		if err != nil {
@@ -73,14 +94,16 @@ func FromGraph(g Graph) (*Canvas, error) {
 	return c, nil
 }
 
-// Graph 画布的 wire 结构:{"canvas":{width,height},"layers":[图层节点…]}
+// Graph 画布的 wire 结构:{"canvas":{width,height,background?},"layers":[图层节点…]}
 type Graph struct {
 	Canvas CanvasSize   `json:"canvas"`
 	Layers []layer.Node `json:"layers"`
 }
 
-// CanvasSize 画布尺寸
+// CanvasSize 画布尺寸;键序钉死 width, height, background(ADR 0022)
 type CanvasSize struct {
 	Width  int `json:"width"`
 	Height int `json:"height"`
+	// Background 条件写键:nil 整键不落;落键仅非空分量落键(见 CanvasBackground)
+	Background *CanvasBackground `json:"background,omitempty"`
 }

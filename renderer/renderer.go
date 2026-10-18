@@ -67,10 +67,11 @@ func New(backend Backend, rs *resolver.ResourceResolver) Renderer {
 	return &template{backend: backend, resolver: rs}
 }
 
-// Render implements Renderer:建面 → 逐层 paint(绘制分派前按需物化)→ 收尾。
+// Render implements Renderer:建面 → 背景铺装 → 逐层 paint(绘制分派前按需物化)→ 收尾。
 // 失败即抛、渲染面丢弃、无产物逃逸(begin 已调用但 end 不达)。
 // 根层渲染循环跳过 visible=false(layer-panel-ux 工单 01,隐藏=最终输出排除):
-// 过滤在建面循环之前,隐藏层的绘制分派与惰性物化均不发生
+// 过滤在建面循环之前,隐藏层的绘制分派与惰性物化均不发生。
+// 背景只随 Render(画布)走(ADR 0022 / spec §4 Q9):RenderLayer 无画布矩形语义不画
 func (r *template) Render(ctx context.Context, c *canvas.Canvas) (any, error) {
 	layers := c.GetLayers()
 	visible := make([]layer.Layer, 0, len(layers))
@@ -79,24 +80,27 @@ func (r *template) Render(ctx context.Context, c *canvas.Canvas) (any, error) {
 			visible = append(visible, l)
 		}
 	}
-	return r.renderSurface(ctx, c.Width(), c.Height(), visible)
+	return r.renderSurface(ctx, c.Width(), c.Height(), visible, c.Background())
 }
 
 // RenderLayer implements Renderer:以其自身尺寸建面,物化时机同 Render(惰性)。
-// 不做显隐过滤——visible 语义属画布渲染循环,单图层渲染所见即所得
+// 不做显隐过滤——visible 语义属画布渲染循环,单图层渲染所见即所得;不画背景
 func (r *template) RenderLayer(ctx context.Context, l layer.Layer) (any, error) {
 	p, ok := l.(paintable)
 	if !ok {
 		return nil, fmt.Errorf("%w: %T", layer.ErrUnknownLayerType, l)
 	}
-	return r.renderSurface(ctx, p.Width(), p.Height(), []layer.Layer{l})
+	return r.renderSurface(ctx, p.Width(), p.Height(), []layer.Layer{l}, nil)
 }
 
-// renderSurface 建面 → 逐层 paint → 收尾;任一原语/物化报错即中止(渲染面丢弃)。
+// renderSurface 建面 → 背景铺装 → 逐层 paint → 收尾;任一原语/物化报错即中止(渲染面丢弃)。
 // 根层循环每图层前设控制面检查点(与 php render 根层循环同位,工票 03):
 // ctx 到期/取消报渲染 code,先于下一层的绘制分派与惰性物化
-func (r *template) renderSurface(ctx context.Context, width, height int, layers []layer.Layer) (any, error) {
+func (r *template) renderSurface(ctx context.Context, width, height int, layers []layer.Layer, background *canvas.CanvasBackground) (any, error) {
 	if err := r.backend.Begin(width, height); err != nil {
+		return nil, err
+	}
+	if err := r.paintBackground(ctx, background, width, height); err != nil {
 		return nil, err
 	}
 	for _, l := range layers {
@@ -108,6 +112,32 @@ func (r *template) renderSurface(ctx context.Context, width, height int, layers 
 		}
 	}
 	return r.backend.End(), nil
+}
+
+// paintBackground 背景铺装(ADR 0022 / spec §4):根层循环之前的唯一插入点,先色后图——
+// 背景之下无物(画布初始透明保留),背景图透明区露背景色。铺色复用 DrawRect 原语
+// (无边框),铺图复用 DrawImage 原语(整幅画布矩形 = cover 语义);背景图画布级
+// 惰性物化(绘制分派前、失败即抛、产物整体丢弃),无背景零开销
+func (r *template) paintBackground(ctx context.Context, background *canvas.CanvasBackground, width, height int) error {
+	if background == nil {
+		return nil
+	}
+
+	if color := background.Color; color != nil {
+		if err := r.backend.DrawRect(0, 0, width, height, color, layer.Border{}); err != nil {
+			return err
+		}
+	}
+
+	image := background.Image
+	if image == nil {
+		return nil
+	}
+	src, err := r.resolver.ResolveBackground(ctx, *image)
+	if err != nil {
+		return err
+	}
+	return r.backend.DrawImage(src, 0, 0, width, height)
 }
 
 // paint 在绝对坐标 (originX, originY) 处按图层自身定位设定绘制:

@@ -199,7 +199,9 @@ func (p *Paginator) split(c *canvas.Canvas) ([]*canvas.Canvas, error) {
 		pageLayers[driverIndex] = pageTableGraph
 
 		page, err := canvas.FromGraph(canvas.Graph{
-			Canvas: canvas.CanvasSize{Width: c.Width(), Height: pageHeight},
+			// canvas 键手工重组:背景必须显式携带每页(ADR 0022 易漏点 2,与 PHP
+			// CanvasPaginator 页 canvas 手工拼键同款);背景值对象不可变,各页共享实例
+			Canvas: canvas.CanvasSize{Width: c.Width(), Height: pageHeight, Background: graph.Canvas.Background},
 			Layers: pageLayers,
 		})
 		if err != nil {
