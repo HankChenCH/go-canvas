@@ -4,9 +4,10 @@ package paginate_test
 // 两份三端共享语义 fixture 逐用例驱动 Go 管线「解码 → paginate/compile 入口 →
 // 比对 expect(页 graph 列表或 errorCode)」。
 //
-//   - paginate/testdata/paginate-semantics.json(paginate-semantics v1,12 用例)
+//   - paginate/testdata/paginate-semantics.json(paginate-semantics v1.0,12 用例)
 //     管线 = graph → canvas.FromGraph → Paginator.Paginate → 页 graph 列表
-//   - paginate/testdata/flow-semantics.json(flow-semantics v1,20 用例)
+//   - paginate/testdata/flow-semantics.json(flow-semantics v1.1,21 用例,v1.1 增软诊断面:
+//     expect.warnings 序列比对 = code + path + 序列序,工票 05)
 //     管线 = 模板态 frames graph → 逐帧 canvas.FromGraph →
 //     DocumentCompiler.Compile(frames, dataset, flowChain) → 帧序×页序页 graph 列表
 //
@@ -196,8 +197,8 @@ func TestFlowSemanticsFixtures(t *testing.T) {
 	if err := json.Unmarshal(loadFixture(t, "testdata/flow-semantics.json"), &doc); err != nil {
 		t.Fatalf("解码 fixture: %v", err)
 	}
-	if doc.Meta.Contract != "flow-semantics v1" {
-		t.Fatalf("contract = %q, want flow-semantics v1", doc.Meta.Contract)
+	if doc.Meta.Contract != "flow-semantics v1.1" {
+		t.Fatalf("contract = %q, want flow-semantics v1.1", doc.Meta.Contract)
 	}
 
 	compiler := paginate.NewDocumentCompiler(nil)
@@ -227,6 +228,16 @@ func TestFlowSemanticsFixtures(t *testing.T) {
 			}
 
 			result, err := compiler.Compile(frames, dataset, tc.FlowChain)
+			if err == nil && result != nil {
+				// 软诊断比对(工票 05):warnings 断言面 = code + path + 序列序
+				var want struct {
+					Warnings []paginate.Diagnostic `json:"warnings"`
+				}
+				if err := json.Unmarshal(tc.Expect, &want); err != nil {
+					t.Fatalf("解码预期 warnings: %v", err)
+				}
+				compareDiagnostics(t, "flow", result.Warnings, want.Warnings)
+			}
 			var canvases []*canvas.Canvas
 			if result != nil {
 				canvases = result.Canvases
@@ -236,5 +247,20 @@ func TestFlowSemanticsFixtures(t *testing.T) {
 			green++
 		}
 	}
-	t.Logf("flow-semantics v1:%d 用例,%d 绿 / %d 红", len(doc.Cases), green, len(doc.Cases)-green)
+	t.Logf("flow-semantics v1.1:%d 用例,%d 绿 / %d 红", len(doc.Cases), green, len(doc.Cases)-green)
+}
+
+// compareDiagnostics 软诊断期望序列比对(工票 05):断言面 = code + path +
+// 序列序(消息人读可本地化,不入断言面;期望省略 warnings 键 = 空序列)
+func compareDiagnostics(t *testing.T, contract string, got, want []paginate.Diagnostic) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("%s 诊断数 = %d, want %d\n got  %+v\n want %+v", contract, len(got), len(want), got, want)
+	}
+	for i := range want {
+		if got[i].Code != want[i].Code || got[i].Path != want[i].Path {
+			t.Errorf("%s 诊断[%d] = {code:%q path:%q}, want {code:%q path:%q}",
+				contract, i, got[i].Code, got[i].Path, want[i].Code, want[i].Path)
+		}
+	}
 }

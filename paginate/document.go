@@ -62,16 +62,14 @@ func (n *FlowChainNode) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Diagnostic 软诊断(spec §5.1):hydrate 兜底一类软失败观测,与硬失败
-// (异常/sentinel)分通道。Path 空 = 未定位
-type Diagnostic struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-	Path    string `json:"path,omitempty"`
-}
+// Diagnostic 软诊断(spec §5.1):值类型定义在 hydrate(发射缝所在包,依赖方向
+// paginate → hydrate),此处类型别名保既有源面兼容。Path 空 = 未定位
+type Diagnostic = hydrate.Diagnostic
 
 // CompileResult 文档编译产物(spec §5.1/§10.1):页序列按帧序 × 页序扁平拼接;
-// warnings 全帧共享单一 collector、不带帧标识(帧标识升格走 spec 版本)
+// warnings 全帧共享单一 collector、不带帧标识(帧标识升格走 spec 版本)。
+// 现役发射面 = hydrate 文案类兜底空串(expression_fallback_empty,
+// spec/pipeline.md §4);未触发时为空序列
 type CompileResult struct {
 	Canvases []*canvas.Canvas
 	Warnings []Diagnostic
@@ -119,7 +117,7 @@ func (c *DocumentCompiler) Compile(frames []*canvas.Canvas, dataset any, flowCha
 
 // compileWithoutFlow 无流路径(spec §10.3):先全量 hydrate,后逐帧 paginate(分页关)
 func (c *DocumentCompiler) compileWithoutFlow(frames []*canvas.Canvas, dataset any) (*CompileResult, error) {
-	hydrated, err := c.hydrateAll(frames, dataset)
+	hydrated, warnings, err := c.hydrateAll(frames, dataset)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +132,7 @@ func (c *DocumentCompiler) compileWithoutFlow(frames []*canvas.Canvas, dataset a
 		canvases = append(canvases, pages...)
 	}
 
-	return &CompileResult{Canvases: canvases, Warnings: noDiagnostics()}, nil
+	return &CompileResult{Canvases: canvases, Warnings: warnings}, nil
 }
 
 // flowAllocation 帧分配结果:切得的行份额 + 源节点(回写定位与零行跳帧裁决用)
@@ -152,7 +150,7 @@ func (c *DocumentCompiler) compileWithFlow(frames []*canvas.Canvas, dataset any,
 	}
 
 	// 1 全量 hydrate:$index 即全局序号、行高定稿——分配与聚合正确性的来源(ADR 0009)
-	hydrated, err := c.hydrateAll(frames, dataset)
+	hydrated, warnings, err := c.hydrateAll(frames, dataset)
 	if err != nil {
 		return nil, err
 	}
@@ -232,29 +230,24 @@ func (c *DocumentCompiler) compileWithFlow(frames []*canvas.Canvas, dataset any,
 		canvases = append(canvases, pages...)
 	}
 
-	return &CompileResult{Canvases: canvases, Warnings: noDiagnostics()}, nil
+	return &CompileResult{Canvases: canvases, Warnings: warnings}, nil
 }
 
-// hydrateAll 全帧共享单一求值器实例的全量 hydrate(spec §10.3 步骤 1):
-// 既有 hydrate 错误语义逐帧原样适用,任一帧失败即抛
-func (c *DocumentCompiler) hydrateAll(frames []*canvas.Canvas, dataset any) ([]*canvas.Canvas, error) {
+// hydrateAll 全帧共享单一求值器实例与单一软诊断收集器的全量 hydrate
+// (spec §10.3 步骤 1):warnings 按帧序累积、不带帧标识;既有 hydrate 错误
+// 语义逐帧原样适用,任一帧失败即抛
+func (c *DocumentCompiler) hydrateAll(frames []*canvas.Canvas, dataset any) ([]*canvas.Canvas, []hydrate.Diagnostic, error) {
 	hydrator := hydrate.NewHydrator(c.evaluator)
+	warnings := hydrate.NewDiagnosticCollector()
 	hydrated := make([]*canvas.Canvas, 0, len(frames))
 	for _, frame := range frames {
-		h, err := hydrator.Hydrate(frame, dataset)
+		h, err := hydrator.Hydrate(frame, dataset, warnings)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		hydrated = append(hydrated, h)
 	}
-	return hydrated, nil
-}
-
-// noDiagnostics 软诊断空通道:PHP 侧 warnings 经 DiagnosticCollector 随 hydrate
-// 发射(spec §3.3 文案兜底);Go hydrate 面尚无软诊断发射缝(文案兜底静默直通),
-// warnings 恒空——发射缝落地时在 hydrateAll 接线,CompileResult 形状不变
-func noDiagnostics() []Diagnostic {
-	return []Diagnostic{}
+	return hydrated, warnings.All(), nil
 }
 
 // nodeRows 表节点的实例行序列(V1 形态 rows 键);模板态或未实例化无 rows 键 = 空序列

@@ -7,6 +7,7 @@ package hydrate_test
 import (
 	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -685,5 +686,177 @@ func TestBackgroundPassesThroughHydrate(t *testing.T) {
 	want := `{"canvas":{"width":320,"height":400,"background":{"color":"#ffffff","image":"https://cdn.example.com/bg.png"}}`
 	if got := jsonOf(t, hydrated.Graph()); !strings.HasPrefix(got, want) {
 		t.Errorf("hydrate 产物 canvas 段背景键不符:\n got  %s\n want 前缀 %s", got, want)
+	}
+}
+
+// ---- 软诊断发射缝(spec/pipeline.md §4):文案类表达式兜底空串发射
+// expression_fallback_empty,code/message/path 与 PHP 权威端逐字对齐,
+// 序列即发射序(文档序);未接收集器 = 静默兜底,存量行为零变化
+
+func fallbackText(expression string) *layer.TextLayer {
+	text := layer.NewTextLayer(layer.WithSize(100, 30), layer.WithFont("", 12, "#000"))
+	text.SetExpression(expression)
+	return text
+}
+
+func TestTextFallbackEmitsDiagnostic(t *testing.T) {
+	collector := hydrate.NewDiagnosticCollector()
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(
+		canvas.New(320, 100, fallbackText("{{missing}}")),
+		map[string]any{"other": "x"}, collector)
+	if err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+
+	want := []hydrate.Diagnostic{{
+		Code:    "expression_fallback_empty",
+		Message: "文案表达式 {{missing}} 求值为空串，已兜底为空",
+		Path:    "layers[0].data.value",
+	}}
+	if !reflect.DeepEqual(collector.All(), want) {
+		t.Errorf("诊断序列 = %+v, want %+v", collector.All(), want)
+	}
+	// 兜底行为本身零变化:求值结果落空串、标记解除
+	if got := hydrated.GetLayers()[0].(*layer.TextLayer).Text(); got != "" {
+		t.Errorf("兜底文本 = %q, want 空串", got)
+	}
+}
+
+func TestTextFallbackSilentWithoutCollector(t *testing.T) {
+	// 未接收集器 = 静默兜底(PHP 可空参数 null 同构),独立管线历史行为零变化
+	hydrated, err := hydrate.NewHydrator(nil).Hydrate(
+		canvas.New(320, 100, fallbackText("{{missing}}")), map[string]any{})
+	if err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+	if got := hydrated.GetLayers()[0].(*layer.TextLayer).Text(); got != "" {
+		t.Errorf("兜底文本 = %q, want 空串", got)
+	}
+}
+
+func TestFallbackMixedHitAndFallbackDocumentOrder(t *testing.T) {
+	// 命中不发射、兜底才发射;多诊断序列 = 图层文档序
+	collector := hydrate.NewDiagnosticCollector()
+	_, err := hydrate.NewHydrator(nil).Hydrate(
+		canvas.New(320, 100,
+			fallbackText("{{orderNo}}"),
+			fallbackText("{{missing}}")),
+		map[string]any{"orderNo": "A2026-001"}, collector)
+	if err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+
+	want := []hydrate.Diagnostic{{
+		Code:    "expression_fallback_empty",
+		Message: "文案表达式 {{missing}} 求值为空串，已兜底为空",
+		Path:    "layers[1].data.value",
+	}}
+	if !reflect.DeepEqual(collector.All(), want) {
+		t.Errorf("诊断序列 = %+v, want %+v", collector.All(), want)
+	}
+}
+
+func TestTemplateRowFallbackDiagnosticPaths(t *testing.T) {
+	// 模板表实例路径 = 产物树落位 rows[实例序],逐行行序发射
+	content := layer.NewTextLayer(layer.WithSize(320, 0), layer.WithAutoHeight(), layer.WithFont("", 12, "#000"))
+	content.SetExpression("{{row.nickname}}")
+	cell := layer.NewTableCellLayer(layer.WithSize(320, 0), layer.WithAutoHeight())
+	cell.AddTemplateContentLayer(content)
+	template := layer.NewTableRowTemplate(layer.WithAutoHeight())
+	template.AddCell(cell)
+	table := layer.NewTableLayer(layer.WithSize(320, 200))
+	table.SetRowsPath("items")
+	table.SetTemplate(template)
+
+	collector := hydrate.NewDiagnosticCollector()
+	_, err := hydrate.NewHydrator(nil).Hydrate(
+		canvas.New(320, 400, table),
+		map[string]any{"items": []any{
+			map[string]any{"name": "甲"},
+			map[string]any{"name": "乙"},
+		}}, collector)
+	if err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+
+	all := collector.All()
+	if len(all) != 2 {
+		t.Fatalf("诊断数 = %d, want 2(%+v)", len(all), all)
+	}
+	wantPaths := []string{
+		"layers[0].rows[0].cells[0].content.data.value",
+		"layers[0].rows[1].cells[0].content.data.value",
+	}
+	for i, wantPath := range wantPaths {
+		if all[i].Path != wantPath {
+			t.Errorf("诊断[%d].Path = %q, want %q", i, all[i].Path, wantPath)
+		}
+		if all[i].Code != "expression_fallback_empty" {
+			t.Errorf("诊断[%d].Code = %q, want expression_fallback_empty", i, all[i].Code)
+		}
+	}
+}
+
+func TestV1RowFallbackDiagnosticPath(t *testing.T) {
+	// V1 表(静态 rows)路径形态 rows[i].cells[j]:命中行静默,兜底行发射
+	row0 := layer.NewTableRowLayer(layer.WithSize(320, 0), layer.WithAutoHeight())
+	cell0 := layer.NewTableCellLayer(layer.WithSize(320, 0), layer.WithAutoHeight())
+	text0 := layer.NewTextLayer(layer.WithSize(320, 0), layer.WithAutoHeight(), layer.WithFont("", 12, "#000"))
+	text0.SetExpression("{{orderNo}}")
+	cell0.AddContentLayer(text0)
+	row0.AddCell(cell0)
+
+	row1 := layer.NewTableRowLayer(layer.WithSize(320, 0), layer.WithAutoHeight())
+	cell1 := layer.NewTableCellLayer(layer.WithSize(320, 0), layer.WithAutoHeight())
+	text1 := layer.NewTextLayer(layer.WithSize(320, 0), layer.WithAutoHeight(), layer.WithFont("", 12, "#000"))
+	text1.SetExpression("{{missing}}")
+	cell1.AddContentLayer(text1)
+	row1.AddCell(cell1)
+
+	table := layer.NewTableLayer(layer.WithSize(320, 200))
+	table.AddRow(row0)
+	table.AddRow(row1)
+
+	collector := hydrate.NewDiagnosticCollector()
+	_, err := hydrate.NewHydrator(nil).Hydrate(
+		canvas.New(320, 400, table), map[string]any{"orderNo": "A2026-001"}, collector)
+	if err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+
+	want := []hydrate.Diagnostic{{
+		Code:    "expression_fallback_empty",
+		Message: "文案表达式 {{missing}} 求值为空串，已兜底为空",
+		Path:    "layers[0].rows[1].cells[0].content.data.value",
+	}}
+	if !reflect.DeepEqual(collector.All(), want) {
+		t.Errorf("诊断序列 = %+v, want %+v", collector.All(), want)
+	}
+}
+
+func TestNullDatasetCollectsNoDiagnostics(t *testing.T) {
+	// 未绑数据集恒等直通先于求值:收集器在场也无发射(PHP 同序)
+	collector := hydrate.NewDiagnosticCollector()
+	_, err := hydrate.NewHydrator(nil).Hydrate(canvas.New(320, 100, fallbackText("{{missing}}")), nil, collector)
+	if err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+	if all := collector.All(); len(all) != 0 {
+		t.Errorf("诊断序列 = %+v, want 空", all)
+	}
+}
+
+func TestResourceEmptyStaysHardError(t *testing.T) {
+	// 资源类求值空串 = 硬错误 fail-fast,不落软诊断(发射面唯一 = 文案类)
+	collector := hydrate.NewDiagnosticCollector()
+	image := layer.NewImageLayer(layer.WithSize(60, 60))
+	image.SetExpression("{{missing}}")
+	_, err := hydrate.NewHydrator(nil).Hydrate(
+		canvas.New(320, 100, image), map[string]any{}, collector)
+	if !errors.Is(err, hydrate.ErrExpressionEmptyResource) {
+		t.Fatalf("错误 = %v, want ErrExpressionEmptyResource", err)
+	}
+	if all := collector.All(); len(all) != 0 {
+		t.Errorf("诊断序列 = %+v, want 空", all)
 	}
 }

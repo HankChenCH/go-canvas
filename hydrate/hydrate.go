@@ -33,8 +33,17 @@ func NewHydrator(evaluator ExpressionEvaluator) *Hydrator {
 }
 
 // Hydrate 填充:全画布标记字段求值 + 模板表实例化。填充走 graph 层改写 +
-// canvas.FromGraph 重建,求值结果永不回写源 graph;identity 场景返回原画布
-func (h *Hydrator) Hydrate(c *canvas.Canvas, dataset any) (*canvas.Canvas, error) {
+// canvas.FromGraph 重建,求值结果永不回写源 graph;identity 场景返回原画布。
+//
+// warnings 为可选软诊断收集通道(spec/pipeline.md §4,PHP 可空参数同构,至多
+// 传一个):文案类表达式兜底空串时发射 expression_fallback_empty;未传或 nil =
+// 静默兜底——独立管线 render(hydrate(...)) 行为与历史零变化
+func (h *Hydrator) Hydrate(c *canvas.Canvas, dataset any, warnings ...*DiagnosticCollector) (*canvas.Canvas, error) {
+	var sink *DiagnosticCollector
+	if len(warnings) > 0 {
+		sink = warnings[0]
+	}
+
 	// 未绑数据集:不跑求值器,全字面(标记字段按 value 镜像显示原文),存量行为零变化
 	if dataset == nil {
 		return c, nil
@@ -51,7 +60,7 @@ func (h *Hydrator) Hydrate(c *canvas.Canvas, dataset any) (*canvas.Canvas, error
 	}
 
 	for i := range graph.Layers {
-		if err := h.hydrateNode(&graph.Layers[i], root, nil); err != nil {
+		if err := h.hydrateNode(&graph.Layers[i], root, nil, fmt.Sprintf("layers[%d]", i), sink); err != nil {
 			return nil, err
 		}
 	}
@@ -92,26 +101,28 @@ func graphHasBindings(nodes []layer.Node) bool {
 }
 
 // hydrateNode 填充单个 graph 节点:求值标记字段 + 结构子树递归(行/格/内容同作用域传递)。
-// rowNamespace 为 nil = 非行上下文,非 nil = 行上下文("row" + "$index")
-func (h *Hydrator) hydrateNode(node *layer.Node, root map[string]any, rowNamespace map[string]any) error {
+// rowNamespace 为 nil = 非行上下文,非 nil = 行上下文("row" + "$index");
+// path = 节点在产物树中的定位路径(诊断发射用,如 layers[0].rows[1].cells[0]),
+// sink 为 nil = 静默兜底(PHP 可空收集器同构)
+func (h *Hydrator) hydrateNode(node *layer.Node, root map[string]any, rowNamespace map[string]any, path string, sink *DiagnosticCollector) error {
 	if node.Type == layer.TypeTable && hasTemplate(node.Template) {
-		return h.hydrateTemplateNode(node, root, rowNamespace)
+		return h.hydrateTemplateNode(node, root, rowNamespace, path, sink)
 	}
 
-	if err := h.evaluateNode(node, root, rowNamespace); err != nil {
+	if err := h.evaluateNode(node, root, rowNamespace, path, sink); err != nil {
 		return err
 	}
 
 	if node.Rows != nil {
 		for i := range *node.Rows {
-			if err := h.hydrateNode(&(*node.Rows)[i], root, rowNamespace); err != nil {
+			if err := h.hydrateNode(&(*node.Rows)[i], root, rowNamespace, fmt.Sprintf("%s.rows[%d]", path, i), sink); err != nil {
 				return err
 			}
 		}
 	}
 	if node.Cells != nil {
 		for i := range *node.Cells {
-			if err := h.hydrateNode(&(*node.Cells)[i], root, rowNamespace); err != nil {
+			if err := h.hydrateNode(&(*node.Cells)[i], root, rowNamespace, fmt.Sprintf("%s.cells[%d]", path, i), sink); err != nil {
 				return err
 			}
 		}
@@ -121,7 +132,7 @@ func (h *Hydrator) hydrateNode(node *layer.Node, root map[string]any, rowNamespa
 		if err := json.Unmarshal(node.Content, &contentNode); err != nil {
 			return fmt.Errorf("解码 content: %w", err)
 		}
-		if err := h.hydrateNode(&contentNode, root, rowNamespace); err != nil {
+		if err := h.hydrateNode(&contentNode, root, rowNamespace, path+".content", sink); err != nil {
 			return err
 		}
 		node.Content = marshalNode(contentNode)
@@ -132,7 +143,7 @@ func (h *Hydrator) hydrateNode(node *layer.Node, root map[string]any, rowNamespa
 // hydrateTemplateNode 模板表实例化:rowsPath 定位行数组 → 每行求值 → 模板行改写
 // 为具体行。行高定稿由 canvas.FromGraph 的 V1 耦合重放完成(声明态豁免在此闭环);
 // 嵌套模板表(模板格内容含 TableLayer)的 rowsPath 以当前行数据为取数范围(行相对)
-func (h *Hydrator) hydrateTemplateNode(node *layer.Node, root map[string]any, rowNamespace map[string]any) error {
+func (h *Hydrator) hydrateTemplateNode(node *layer.Node, root map[string]any, rowNamespace map[string]any, path string, sink *DiagnosticCollector) error {
 	rowsPath := ""
 	if node.Data != nil {
 		rowsPath = node.Data.RowsPath
@@ -154,13 +165,15 @@ func (h *Hydrator) hydrateTemplateNode(node *layer.Node, root map[string]any, ro
 	instances := make([]layer.Node, 0, len(rows))
 	serial := 0
 	for _, item := range rows {
-		// 每行独立解码模板载荷(PHP 数组值拷贝同款,避免指针字段跨行别名)
+		// 每行独立解码模板载荷(PHP 数组值拷贝同款,避免指针字段跨行别名);
+		// 实例路径 = 产物树落位(填充期间实例尚未追加,实例序 = instances 当前长度)
 		var rowNode layer.Node
 		if err := json.Unmarshal(node.Template, &rowNode); err != nil {
 			return fmt.Errorf("解码模板行: %w", err)
 		}
 		serial++
-		if err := h.hydrateNode(&rowNode, root, map[string]any{"row": item, "$index": serial}); err != nil {
+		instancePath := fmt.Sprintf("%s.rows[%d]", path, len(instances))
+		if err := h.hydrateNode(&rowNode, root, map[string]any{"row": item, "$index": serial}, instancePath, sink); err != nil {
 			return err
 		}
 		rowNode.Type = layer.TypeTableRow
@@ -198,8 +211,9 @@ func navigateRows(scope any, rowsPath string) ([]any, error) {
 
 // evaluateNode 标记字段求值:求值结果替换为字面值并解除标记(填充产物无表达式)。
 // 缺字段信号(空串)由本层按字段类施加策略:文案兜底空串、资源类报错(spec §3.4);
+// 文案兜底发生时经收集器发射软诊断(spec/pipeline.md §4),兜底行为本身零变化;
 // 门控三条件 = valueType 标记 + expression 在场 + 绑定面三类内容层(spec §3.1)
-func (h *Hydrator) evaluateNode(node *layer.Node, root map[string]any, rowNamespace map[string]any) error {
+func (h *Hydrator) evaluateNode(node *layer.Node, root map[string]any, rowNamespace map[string]any, path string, sink *DiagnosticCollector) error {
 	if node.Data == nil || node.Data.ValueType != layer.ValueTypeExpression || node.Data.Expression == nil {
 		return nil
 	}
@@ -241,6 +255,16 @@ func (h *Hydrator) evaluateNode(node *layer.Node, root map[string]any, rowNamesp
 
 	if isResource && result == "" {
 		return fmt.Errorf("%w: %s", ErrExpressionEmptyResource, *node.Data.Expression)
+	}
+
+	if node.Type == layer.TypeText && result == "" && sink != nil {
+		// 文案类策略性软失败(spec/pipeline.md §4):兜底照旧,发射观测诊断
+		// (含表达式原文与产物树定位);code 与路径形态与 PHP 权威端逐字对齐
+		sink.Collect(Diagnostic{
+			Code:    DiagnosticExpressionFallbackEmpty,
+			Message: fmt.Sprintf("文案表达式 %s 求值为空串，已兜底为空", *node.Data.Expression),
+			Path:    path + ".data.value",
+		})
 	}
 
 	value := result
