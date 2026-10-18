@@ -1,0 +1,3 @@
+[submodule "canvas-semantics"]
+	path = canvas-semantics
+	url = https://github.com/HankChenCH/canvas-semantics.git

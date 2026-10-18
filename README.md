@@ -62,13 +62,15 @@ c, err = hydrate.NewHydrator(nil).Hydrate(c, dataset) // nil = 默认受限插�
 
 ## 双端一致性
 
-- wire 字节面与语义以 **PHP 为权威**：`renderer/testdata/layout-snapshot.json`（布局快照）与 `hydrate/testdata/`、`paginate/testdata/`（语义 fixture）由 PHP 端导出提交进本仓库，`make layout-snapshot` / `make hydrate-fixtures` 等按需再生成，何时重导见各 make 目标注释。
+- **编译语义**（求值/填充/分页/流装箱）以语料仓 `canvas-semantics` 为权威（submodule pin 消费，fresh clone 先 `git submodule update --init`）：PHP/Go/TS 三端 runner 共同消费同一批语料，语料 diff 即语义变更、升级 = 一次可审的 submodule 指针移动；本仓支持面见 `support-surface.json`。
+- **wire 字节面**仍以 PHP 权威端为锚：`renderer/testdata/layout-snapshot.json`（布局快照）由 PHP 端导出提交进本仓库，`make layout-snapshot` 按需再生成，何时重导见 Makefile 注释与 `docs/layout-snapshot.md`。
 - 设计共识见 [DESIGN.md](DESIGN.md)；开发约定见 [AGENTS.md](AGENTS.md)。
 
 ## 开发
 
 ```sh
-make test          # 核心 module + image-renderer 两轮 go test（含语义 fixture runner）
+git submodule update --init  # 首次检出语料仓(语义语料权威,runner 直接读 corpus/)
+make test          # 核心 module + image-renderer 两轮 go test（含语义语料 runner）
 make vet
 make visual-check  # 目验样图 → image-renderer/visual-check.png
 ```

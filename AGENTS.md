@@ -17,19 +17,18 @@ Go 移植版画布渲染库 `github.com/HankChenCH/go-canvas`：与 `php-canvas-
 - `resolver/` — 资源物化（下载/缓存/QR 缝），结果回写图层（`SetResolvedSrc/SetResolvedFont`）；画布级入口 `ResolveBackground`（背景图不是图层，物化结果以返回值交渲染器，img_layers 同目录同语义）。`Resolve` 全画布预遍历 API 保留但渲染器不再调用（角色 = 绘制时物化）。
 - `text/` — 断行/度量契约 + 对齐版默认实现；注入点在 `layer.TextLayer`。
 - `image-renderer/` — 嵌套 module：位图后端（`imagerenderer.Renderer` 实现 Backend；`NewRenderer` 返回携带默认物化器——二维码缝默认接线——的具体后端，配 `RenderAs` 即完整管线）+ `typography/` 增强文本 + `cmd/visualcheck` 目验样图。
-- 共享 fixture（均 PHP 导出、JSON 提交进本仓库）：`hydrate/testdata/`（expression-eval v2 = 104 用例 + dateTokens 14 行，runner = `hydrate/fixture_test.go`，token 表表面对 = `hydrate/dateformat_test.go`；expand-semantics v1.1 = 27 用例，expect.warnings 软诊断序列比对 = code + path + 序列序）、`paginate/testdata/`（paginate-semantics v1.0 + flow-semantics v1.1 = 21 用例含软诊断面，runner = `paginate/semantics_test.go`，随常规 `go test` 运行）、`renderer/testdata/layout-snapshot.json`（布局快照，见 `docs/layout-snapshot.md`）。
+- 语义语料（工票 07 起消费翻转）：语料仓 `canvas-semantics` 以 **submodule pin** 进仓（语义权威，PHP/Go/TS 三端平等消费，语料 diff 即语义变更、升级 = 一次可审的指针移动），runner 直接读 `canvas-semantics/corpus/`：`hydrate/fixture_test.go`（expression-eval v2.0 四模块 104 用例 + fn-date 内 dateTokens 14 行，token 表表面对 = `hydrate/dateformat_test.go`；expand-semantics v1.1 = 29 用例，expect.warnings 软诊断序列比对 = code + path + 序列序）、`paginate/semantics_test.go`（paginate-semantics v1.0 = 12 用例 + flow-semantics v1.1 = 23 用例含软诊断面），随常规 `go test` 运行。**fresh clone 先 `git submodule update --init`**（runner 未检出即红，无降级路径）。支持面声明 = 仓根 `support-surface.json`（渲染端四契约全模块，声明即 runner 套件必须绿）。`renderer/testdata/layout-snapshot.json` 是布局快照（wire 字节面，PHP 导出、非语料），见 `docs/layout-snapshot.md`。
 
 ## Commands
 
 ```sh
-make test             # 核心 module + image-renderer 两轮 go test(含两份语义 fixture runner)
+make test             # 核心 module + image-renderer 两轮 go test(含语义语料 runner,需先检出 submodule)
 make vet
 make layout-snapshot  # PHP 导出布局快照（需 PHP 8.3 + ext-intl），人审 diff 后随代码提交
-make hydrate-fixtures  # PHP 导出 V2 共享 fixture（同上）
 make visual-check     # 目验样图 → image-renderer/visual-check.png
 ```
 
-Homebrew PHP 是 keg-only：`export PATH="$(brew --prefix)/opt/php@8.3/bin:$PATH"`。Go CI 不装 PHP——fixture JSON 提交进本仓库，仅人工触发再生成。
+fresh clone 先 `git submodule update --init`（语料仓未检出 runner 即红）。Homebrew PHP 是 keg-only：`export PATH="$(brew --prefix)/opt/php@8.3/bin:$PATH"`（仅 `make layout-snapshot` 需要）。Go CI 不装 PHP——语义语料经 submodule 检出，布局快照 JSON 提交进本仓库、仅人工触发再生成。
 
 ## Rules and gotchas
 
@@ -39,5 +38,5 @@ Homebrew PHP 是 keg-only：`export PATH="$(brew --prefix)/opt/php@8.3/bin:$PATH
 - **错误 code 是三端契约**（spec §5.2）：sentinel + `%w` 包装，`errors.Is` 判定；sentinel 值 = 稳定 code（静态文案码带描述，上下文码 bare + wrap）。消息可改、**code 不可改**；新增错误必须归入解码/填充/绘制三阶段之一。唯一豁免：调用侧用法错误（如 `RenderAs[T]` 的期望类型与后端产物不符，工票 13）发生在渲染成功之后，不属渲染失败，普通可读 error 即可、不设 code。
 - **`Data` 的 `MarshalJSON` 分形态**：`RowsPath` 非空 = 表格形态仅一键。给 `Data` 加字段先想清楚属于哪个形态；Image/Qr 的 `value` 恒写键（可为 null）不可加 omitempty。
 - **填充器的图改写**：模板行每行独立 `json.Unmarshal` 模板载荷（PHP 数组值拷贝同款）——Node 的 `Rows/Cells` 是指针切片、`Content/Template` 是 RawMessage，直接浅拷贝改写会跨行别名；`Hydrate` 不回写源画布有单测锁定。
-- **wire 字节面 / 语义改动**：字节面改动必须 `make layout-snapshot` 重导出并人审 diff（存量用例零 diff = 存量图字节等价）；表达式/填充语义改动跑 `make hydrate-fixtures`（PHP 是语义权威）。
+- **wire 字节面 / 语义改动**：字节面改动必须 `make layout-snapshot` 重导出并人审 diff（存量用例零 diff = 存量图字节等价）；表达式/填充等编译语义改动走语料仓提案通道（`canvas-semantics/proposals/`），本仓随 submodule 指针移动跟进，runner 红即实现未跟上语义。
 - **priority 语义**：越大越先渲染（视觉上越垫底）。

@@ -17,7 +17,11 @@ jobs:
     name: Core (GOWORK=off)
     runs-on: ubuntu-latest
     steps:
+      # 语料仓 submodule(语义语料权威,runner 直接读 corpus/);凭据只覆盖
+      # HTTPS,故 .gitmodules 用 https URL
       - uses: actions/checkout@v4
+        with:
+          submodules: true
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod

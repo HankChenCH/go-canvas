@@ -5,9 +5,8 @@
 //   - Paginator.Paginate:单画布分页 Canvas 1→n(装箱/溢出/几何语义)
 //   - DocumentCompiler.Compile:N 帧 × 1 dataset × 流链声明的文档编译(ADR 0009)
 //
-// 语义由两份 PHP 导出 fixture 钉死(testdata/,runner = semantics_test.go,
-// 并入 make test):paginate-semantics v1 十二规定用例 + flow-semantics v1
-// 二十规定用例。
+// 语义由 submodule 语料仓钉死(canvas-semantics/corpus/,runner = semantics_test.go,
+// 并入 make test):paginate-semantics v1.0 + flow-semantics v1.1,语料 diff 即语义变更。
 package paginate
 
 import (

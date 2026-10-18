@@ -1,0 +1,42 @@
+{
+    "declaration": "canvas-semantics/support-surface v1",
+    "implementation": {
+        "repo": "github.com/HankChenCH/go-canvas",
+        "language": "go",
+        "profile": "renderer",
+        "note": "渲染端,全量支持求值/填充/分页/流装箱四契约全部模块文件(含工票 05 软诊断面);编辑器扫描面(expression-scan)不在渲染端支持面,按缺席 = 不支持处理"
+    },
+    "contracts": [
+        {
+            "id": "expression-eval",
+            "version": "v2.0",
+            "moduleFiles": [
+                { "id": "shell", "support": "supported", "note": "" },
+                { "id": "path", "support": "supported", "note": "" },
+                { "id": "fn-date", "support": "supported", "note": "" },
+                { "id": "fn-number", "support": "supported", "note": "" }
+            ]
+        },
+        {
+            "id": "expand-semantics",
+            "version": "v1.1",
+            "moduleFiles": [
+                { "id": "expand", "support": "supported", "note": "含 expect.warnings 软诊断面(工票 05 发射缝)" }
+            ]
+        },
+        {
+            "id": "paginate-semantics",
+            "version": "v1.0",
+            "moduleFiles": [
+                { "id": "paginate", "support": "supported", "note": "" }
+            ]
+        },
+        {
+            "id": "flow-semantics",
+            "version": "v1.1",
+            "moduleFiles": [
+                { "id": "flow", "support": "supported", "note": "含 expect.warnings 软诊断面(工票 05 全帧汇入)" }
+            ]
+        }
+    ]
+}
