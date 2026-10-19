@@ -22,14 +22,8 @@ import (
 	"testing"
 
 	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/corpus"
 	"github.com/HankChenCH/go-canvas/paginate"
-)
-
-// runner 钉定的契约版本串,与语料 meta.contract 双写互检——语料升版本
-// (次版本纯增/主版本语义变更)未同步常量即红,语义升级可审
-const (
-	paginateContract = "paginate-semantics v1.0"
-	flowContract     = "flow-semantics v1.1"
 )
 
 // fixtureErrorCodes 稳定 code → sentinel 映射(pipeline.md §4/§10 两段全量;
@@ -170,7 +164,7 @@ func TestPaginateSemanticsFixtures(t *testing.T) {
 		} `json:"cases"`
 	}
 	// 契约版本互检在 loadCorpus 内单点完成,此处不再重复断言
-	if err := json.Unmarshal(loadCorpus(t, "paginate-semantics/v1.0/paginate.json", paginateContract), &doc); err != nil {
+	if err := json.Unmarshal(loadCorpus(t, "paginate-semantics/v1.0/paginate.json", corpus.ContractPaginate), &doc); err != nil {
 		t.Fatalf("解码语料: %v", err)
 	}
 
@@ -208,7 +202,7 @@ func TestFlowSemanticsFixtures(t *testing.T) {
 			Expect      json.RawMessage          `json:"expect"`
 		} `json:"cases"`
 	}
-	if err := json.Unmarshal(loadCorpus(t, "flow-semantics/v1.1/flow.json", flowContract), &doc); err != nil {
+	if err := json.Unmarshal(loadCorpus(t, "flow-semantics/v1.1/flow.json", corpus.ContractFlow), &doc); err != nil {
 		t.Fatalf("解码语料: %v", err)
 	}
 

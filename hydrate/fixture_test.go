@@ -17,15 +17,9 @@ import (
 	"testing"
 
 	"github.com/HankChenCH/go-canvas/canvas"
+	"github.com/HankChenCH/go-canvas/corpus"
 	"github.com/HankChenCH/go-canvas/hydrate"
 	"github.com/HankChenCH/go-canvas/layer"
-)
-
-// runner 钉定的契约版本串,与语料 meta.contract 双写互检——语料升版本
-// (次版本纯增/主版本语义变更)未同步常量即红,语义升级可审
-const (
-	expressionEvalContract = "expression-eval v3.0"
-	expandContract         = "expand-semantics v1.1"
 )
 
 // evalModules 求值契约语义域拆分(语料仓模块注册表 v1):外壳/路径/日期/数字函数族
@@ -112,7 +106,7 @@ func TestExpressionEvalCorpus(t *testing.T) {
 	for _, module := range evalModules {
 		var doc evalDocument
 		rel := "expression-eval/v3.0/" + module + ".json"
-		if err := json.Unmarshal(loadCorpus(t, rel, expressionEvalContract), &doc); err != nil {
+		if err := json.Unmarshal(loadCorpus(t, rel, corpus.ContractExpressionEval), &doc); err != nil {
 			t.Fatalf("解码语料 %s: %v", rel, err)
 		}
 		for _, tc := range doc.Cases {
@@ -159,7 +153,7 @@ func TestEvalCorpusModulesWellFormed(t *testing.T) {
 			} `json:"cases"`
 		}
 		rel := "expression-eval/v3.0/" + module + ".json"
-		if err := json.Unmarshal(loadCorpus(t, rel, expressionEvalContract), &doc); err != nil {
+		if err := json.Unmarshal(loadCorpus(t, rel, corpus.ContractExpressionEval), &doc); err != nil {
 			t.Fatalf("解码语料 %s: %v", rel, err)
 		}
 		if len(doc.Cases) == 0 {
@@ -193,7 +187,7 @@ func TestDateTokensCorpus(t *testing.T) {
 			} `json:"rows"`
 		} `json:"dateTokens"`
 	}
-	if err := json.Unmarshal(loadCorpus(t, "expression-eval/v3.0/fn-date.json", expressionEvalContract), &doc); err != nil {
+	if err := json.Unmarshal(loadCorpus(t, "expression-eval/v3.0/fn-date.json", corpus.ContractExpressionEval), &doc); err != nil {
 		t.Fatalf("解码语料 dateTokens: %v", err)
 	}
 
@@ -223,7 +217,7 @@ func TestExpandSemanticsCorpus(t *testing.T) {
 			Expect      json.RawMessage `json:"expect"`
 		} `json:"cases"`
 	}
-	if err := json.Unmarshal(loadCorpus(t, "expand-semantics/v1.1/expand.json", expandContract), &doc); err != nil {
+	if err := json.Unmarshal(loadCorpus(t, "expand-semantics/v1.1/expand.json", corpus.ContractExpand), &doc); err != nil {
 		t.Fatalf("解码语料: %v", err)
 	}
 
