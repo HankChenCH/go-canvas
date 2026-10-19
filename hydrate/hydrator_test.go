@@ -1,7 +1,7 @@
 package hydrate_test
 
 // 填充步骤单测(对拍基准 = php-canvas-next tests/Hydrate/CanvasHydratorTest.php 逐用例平移;
-// 共享 fixture 语义由 fixture_test.go 的 runner 覆盖,本文件补 Go 特有面:
+// 共享语料语义由 corpus_test.go 的 runner 覆盖,本文件补 Go 特有面:
 // 同对象恒等、源图不污染、struct 数据集归一、求值器注入)。
 
 import (

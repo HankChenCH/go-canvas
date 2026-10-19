@@ -26,9 +26,9 @@ import (
 	"github.com/HankChenCH/go-canvas/paginate"
 )
 
-// fixtureErrorCodes 稳定 code → sentinel 映射(pipeline.md §4/§10 两段全量;
+// corpusErrorCodes 稳定 code → sentinel 映射(pipeline.md §4/§10 两段全量;
 // 语料 errorCode 字符串经它对位 errors.Is)。
-var fixtureErrorCodes = map[string]error{
+var corpusErrorCodes = map[string]error{
 	"content_overflow":            paginate.ErrContentOverflow,
 	"paginate_target_invalid":     paginate.ErrPaginateTargetInvalid,
 	"page_geometry_invalid":       paginate.ErrPageGeometryInvalid,
@@ -36,11 +36,11 @@ var fixtureErrorCodes = map[string]error{
 	"flow_rows_path_inconsistent": paginate.ErrFlowRowsPathInconsistent,
 }
 
-// fixtureErrorCode 定位错误对应的稳定 code;不在 code 集内的错误直接失败
+// corpusErrorCode 定位错误对应的稳定 code;不在 code 集内的错误直接失败
 // (静默放行会让语料失去三端一致性锚点作用)
-func fixtureErrorCode(t *testing.T, err error) string {
+func corpusErrorCode(t *testing.T, err error) string {
 	t.Helper()
-	for code, sentinel := range fixtureErrorCodes {
+	for code, sentinel := range corpusErrorCodes {
 		if errors.Is(err, sentinel) {
 			return code
 		}
@@ -129,7 +129,7 @@ func runPipelineCase(t *testing.T, pagesKey string, expect json.RawMessage, canv
 		if err == nil {
 			t.Fatalf("预期错误 %s,但管线成功(产出 %d 页)", wantErr.ErrorCode, len(canvases))
 		}
-		if got := fixtureErrorCode(t, err); got != wantErr.ErrorCode {
+		if got := corpusErrorCode(t, err); got != wantErr.ErrorCode {
 			t.Fatalf("错误 code = %s, want %s", got, wantErr.ErrorCode)
 		}
 		return

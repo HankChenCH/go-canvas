@@ -2,7 +2,7 @@ package hydrate
 
 // 内置 token 表与语料权威导出(corpus fn-date.json 的 dateTokens 转译表)逐行
 // 对位:表基数、顺序、token、语义串全等——「Go 端内置同构表、语料断言锁漂移」的
-// 表面锁定(fixture_test.go 的 TestDateTokensCorpus 锁的是渲染行为面)。
+// 表面锁定(corpus_test.go 的 TestDateTokensCorpus 锁的是渲染行为面)。
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ import (
 )
 
 func TestDateTokenTableMatchesCorpus(t *testing.T) {
-	// 语料仓 submodule 在包目录同级;未检出/pin 落后在此给出指引(与 fixture_test.go 同款)
+	// 语料仓 submodule 在包目录同级;未检出/pin 落后在此给出指引(与 corpus_test.go 同款)
 	raw, err := os.ReadFile(filepath.Join("..", "canvas-semantics", "corpus", "expression-eval", "v3.0", "fn-date.json"))
 	if err != nil {
 		t.Fatalf("读取语料 dateTokens 转译表: %v(语料仓 submodule 未检出?先 git submodule update --init)", err)

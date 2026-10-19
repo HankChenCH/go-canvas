@@ -25,9 +25,9 @@ import (
 // evalModules 求值契约语义域拆分(语料仓模块注册表 v1):外壳/路径/日期/数字函数族
 var evalModules = []string{"shell", "path", "fn-date", "fn-number"}
 
-// hydrateErrorCodes 稳定 code → sentinel 映射(跨包汇总解码期与填充期;
+// corpusErrorCodes 稳定 code → sentinel 映射(跨包汇总解码期与填充期;
 // 语料 errorCode 字符串经它对位 errors.Is)
-var hydrateErrorCodes = map[string]error{
+var corpusErrorCodes = map[string]error{
 	"unknown_layer_type":             layer.ErrUnknownLayerType,
 	"template_rows_conflict":         layer.ErrTemplateRowsConflict,
 	"rows_path_missing":              layer.ErrRowsPathMissing,
@@ -40,11 +40,11 @@ var hydrateErrorCodes = map[string]error{
 	"expression_syntax_error":        hydrate.ErrExpressionSyntaxError,
 }
 
-// fixtureErrorCode 定位错误对应的稳定 code;不在 code 集内的错误直接失败
+// corpusErrorCode 定位错误对应的稳定 code;不在 code 集内的错误直接失败
 // (静默放行会让语料失去一致性锚点作用)
-func fixtureErrorCode(t *testing.T, err error) string {
+func corpusErrorCode(t *testing.T, err error) string {
 	t.Helper()
-	for code, sentinel := range hydrateErrorCodes {
+	for code, sentinel := range corpusErrorCodes {
 		if errors.Is(err, sentinel) {
 			return code
 		}
@@ -122,7 +122,7 @@ func TestExpressionEvalCorpus(t *testing.T) {
 					if err == nil {
 						t.Fatalf("预期错误 %s,但求值成功(%q)", wantCode.ErrorCode, result)
 					}
-					if got := fixtureErrorCode(t, err); got != wantCode.ErrorCode {
+					if got := corpusErrorCode(t, err); got != wantCode.ErrorCode {
 						t.Fatalf("错误 code = %s, want %s", got, wantCode.ErrorCode)
 					}
 					return
@@ -271,7 +271,7 @@ func TestExpandSemanticsCorpus(t *testing.T) {
 			if jsonErr := json.Unmarshal(tc.Expect, &wantErr); jsonErr != nil || wantErr.ErrorCode == "" {
 				t.Fatalf("管线意外报错: %v", err)
 			}
-			if got := fixtureErrorCode(t, err); got != wantErr.ErrorCode {
+			if got := corpusErrorCode(t, err); got != wantErr.ErrorCode {
 				t.Fatalf("错误 code = %s, want %s", got, wantErr.ErrorCode)
 			}
 		})
