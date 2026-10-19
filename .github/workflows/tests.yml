@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      # 支持面声明三互检（SUPPORT-SURFACE §5.2）:canvasctl 随语料 submodule pin 消费
+      # 支持面声明三互检(SUPPORT-SURFACE §5.2):canvasctl 随语料 submodule pin 消费
       # (工具版本 = 语料版本),校验本仓声明形状/注册表/版本与 pin 的语料一致
       - name: Validate support-surface.json
         working-directory: canvas-semantics

@@ -2,7 +2,7 @@ package hydrate_test
 
 // 三端共享语义语料 runner(工票 07 消费翻转):语义权威 = submodule 语料仓
 // canvas-semantics(本仓 pin 消费,镜像副本已删除),runner 直接读 corpus/ 下的
-// expression-eval v2.0(shell/path/fn-date/fn-number 四模块,104 用例)与
+// expression-eval v3.0(shell/path/fn-date/fn-number 四模块,107 用例)与
 // expand-semantics v1.1(29 用例,v1.1 增软诊断面:expect.warnings 序列比对 =
 // code + path + 序列序,工票 05)。语料 diff 即语义变更,升级 = 一次可审的
 // submodule 指针移动;fresh clone 先 git submodule update --init。
@@ -24,7 +24,7 @@ import (
 // runner 钉定的契约版本串,与语料 meta.contract 双写互检——语料升版本
 // (次版本纯增/主版本语义变更)未同步常量即红,语义升级可审
 const (
-	expressionEvalContract = "expression-eval v2.0"
+	expressionEvalContract = "expression-eval v3.0"
 	expandContract         = "expand-semantics v1.1"
 )
 
@@ -111,7 +111,7 @@ func TestExpressionEvalCorpus(t *testing.T) {
 	evaluator := hydrate.NewInterpolationEvaluator()
 	for _, module := range evalModules {
 		var doc evalDocument
-		rel := "expression-eval/v2.0/" + module + ".json"
+		rel := "expression-eval/v3.0/" + module + ".json"
 		if err := json.Unmarshal(loadCorpus(t, rel, expressionEvalContract), &doc); err != nil {
 			t.Fatalf("解码语料 %s: %v", rel, err)
 		}
@@ -158,7 +158,7 @@ func TestEvalCorpusModulesWellFormed(t *testing.T) {
 				Name string `json:"name"`
 			} `json:"cases"`
 		}
-		rel := "expression-eval/v2.0/" + module + ".json"
+		rel := "expression-eval/v3.0/" + module + ".json"
 		if err := json.Unmarshal(loadCorpus(t, rel, expressionEvalContract), &doc); err != nil {
 			t.Fatalf("解码语料 %s: %v", rel, err)
 		}
@@ -193,7 +193,7 @@ func TestDateTokensCorpus(t *testing.T) {
 			} `json:"rows"`
 		} `json:"dateTokens"`
 	}
-	if err := json.Unmarshal(loadCorpus(t, "expression-eval/v2.0/fn-date.json", expressionEvalContract), &doc); err != nil {
+	if err := json.Unmarshal(loadCorpus(t, "expression-eval/v3.0/fn-date.json", expressionEvalContract), &doc); err != nil {
 		t.Fatalf("解码语料 dateTokens: %v", err)
 	}
 

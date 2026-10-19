@@ -9,7 +9,7 @@
     "contracts": [
         {
             "id": "expression-eval",
-            "version": "v2.0",
+            "version": "v3.0",
             "moduleFiles": [
                 { "id": "shell", "support": "supported", "note": "" },
                 { "id": "path", "support": "supported", "note": "" },

@@ -43,6 +43,7 @@ var dateTokenTable = []struct {
 	{"s", "秒 0-59"},
 	{"dddd", "周几中文全称：星期日…星期六"},
 	{"ddd", "周几中文简称：周日…周六"},
+	{"Q", "季度 1-4（ceil(月/3)）"},
 }
 
 // dateWeekFull / dateWeekShort 周几中文输出,下标 = Sakamoto 周几(0 = 星期日)
@@ -198,6 +199,8 @@ func dateRenderToken(token string, dt dateParts) string {
 		return strconv.Itoa(dt.s)
 	case "dddd":
 		return dateWeekFull[dateWeekday(dt.y, dt.mo, dt.d)]
+	case "Q":
+		return strconv.Itoa((dt.mo-1)/3 + 1)
 	default: // "ddd"
 		return dateWeekShort[dateWeekday(dt.y, dt.mo, dt.d)]
 	}

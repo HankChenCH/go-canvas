@@ -13,7 +13,7 @@ import (
 
 func TestDateTokenTableMatchesCorpus(t *testing.T) {
 	// 语料仓 submodule 在包目录同级;未检出/pin 落后在此给出指引(与 fixture_test.go 同款)
-	raw, err := os.ReadFile(filepath.Join("..", "canvas-semantics", "corpus", "expression-eval", "v2.0", "fn-date.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "canvas-semantics", "corpus", "expression-eval", "v3.0", "fn-date.json"))
 	if err != nil {
 		t.Fatalf("读取语料 dateTokens 转译表: %v(语料仓 submodule 未检出?先 git submodule update --init)", err)
 	}
