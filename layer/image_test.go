@@ -155,6 +155,23 @@ func TestFitContainWrittenLastInSpec(t *testing.T) {
 	}
 }
 
+// TestFitFillTileWrittenLastInSpec fill/tile 转正落键腿(ADR 0024):值是透传字符串,
+// 转正不改字节面——落键条件(仅 fit≠cover)与殿后键序与 contain 同款
+func TestFitFillTileWrittenLastInSpec(t *testing.T) {
+	for _, fit := range []string{layer.FitFill, layer.FitTile} {
+		l := layer.NewImageLayer(layer.WithSize(100, 100), layer.WithImage("https://example.com/a.png"))
+		l.SetFit(fit)
+
+		spec := l.Graph().Spec
+		if spec.Fit == nil || *spec.Fit != fit {
+			t.Errorf("fit=%s 落键不符: got %v", fit, spec.Fit)
+		}
+		if got := jsonOf(t, l.Graph()); !strings.Contains(got, `,"fit":"`+fit+`"},"data":`) {
+			t.Errorf("fit=%s 应殿后 spec 末位: %s", fit, got)
+		}
+	}
+}
+
 func TestFitRoundtripIdentity(t *testing.T) {
 	l := layer.NewImageLayer(
 		layer.WithSize(30, 20),
@@ -173,6 +190,30 @@ func TestFitRoundtripIdentity(t *testing.T) {
 	}
 	if got, want := jsonOf(t, rebuilt.Graph()), jsonOf(t, l.Graph()); got != want {
 		t.Errorf("往返 graph 不恒等:\n got  %s\n want %s", got, want)
+	}
+}
+
+// TestFitFillTileRoundtripIdentity fill/tile 转正往返恒等腿(ADR 0024)
+func TestFitFillTileRoundtripIdentity(t *testing.T) {
+	for _, fit := range []string{layer.FitFill, layer.FitTile} {
+		l := layer.NewImageLayer(
+			layer.WithSize(30, 20),
+			layer.WithImage("https://example.com/a.png"),
+		)
+		l.SetFit(fit)
+
+		var node layer.Node
+		if err := json.Unmarshal([]byte(jsonOf(t, l.Graph())), &node); err != nil {
+			t.Fatalf("解码 graph 节点: %v", err)
+		}
+		rebuilt := layer.ImageFromGraph(node)
+
+		if got := rebuilt.Fit(); got != fit {
+			t.Errorf("fit=%s 重建后 Fit() = %q", fit, got)
+		}
+		if got, want := jsonOf(t, rebuilt.Graph()), jsonOf(t, l.Graph()); got != want {
+			t.Errorf("fit=%s 往返 graph 不恒等:\n got  %s\n want %s", fit, got, want)
+		}
 	}
 }
 
@@ -197,22 +238,23 @@ func TestExplicitCoverWireNormalizedToKeyless(t *testing.T) {
 }
 
 func TestUnknownFitValuePassesThrough(t *testing.T) {
-	// 未知值契约面原样透传(往返恒等);渲染面按 cover 降级属渲染臂职责
+	// 未知值契约面原样透传(往返恒等);渲染面按 cover 降级属渲染臂职责。
+	// fill/tile 已转正(ADR 0024),白名单外示例改用从未入册的值
 	l := layer.NewImageLayer(layer.WithSize(10, 10), layer.WithImage("x"))
 	var node layer.Node
 	if err := json.Unmarshal([]byte(jsonOf(t, l.Graph())), &node); err != nil {
 		t.Fatalf("解码 graph 节点: %v", err)
 	}
-	fill := "fill"
-	node.Spec.Fit = &fill
+	flip := "flip"
+	node.Spec.Fit = &flip
 
 	rebuilt := layer.ImageFromGraph(node)
 
-	if got := rebuilt.Fit(); got != "fill" {
-		t.Errorf("重建后 Fit() = %q, want fill(未知值透传)", got)
+	if got := rebuilt.Fit(); got != "flip" {
+		t.Errorf("重建后 Fit() = %q, want flip(未知值透传)", got)
 	}
-	if got := rebuilt.Graph().Spec.Fit; got == nil || *got != "fill" {
-		t.Errorf("再序列化 spec.fit = %v, want fill", got)
+	if got := rebuilt.Graph().Spec.Fit; got == nil || *got != "flip" {
+		t.Errorf("再序列化 spec.fit = %v, want flip", got)
 	}
 }
 

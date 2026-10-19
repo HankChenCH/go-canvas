@@ -11,6 +11,8 @@ import (
 	"image/draw"
 	"image/jpeg"
 	"image/png"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 )
@@ -18,7 +20,7 @@ import (
 // ---- 手拼字节流工具 ----
 
 // tiffWithOrientation 组装仅含 orientation 标签的 TIFF 块(IFD0 单条目)
-func tiffWithOrientation(bo binary.ByteOrder, typ, orientation uint16) []byte {
+func tiffWithOrientation(bo binary.ByteOrder, typ uint16, orientation int) []byte {
 	var b bytes.Buffer
 	if bo == binary.LittleEndian {
 		b.WriteString("II")
@@ -32,7 +34,7 @@ func tiffWithOrientation(bo binary.ByteOrder, typ, orientation uint16) []byte {
 	_ = binary.Write(&b, bo, typ)
 	_ = binary.Write(&b, bo, uint32(1)) // 计数
 	if typ == 3 {                       // SHORT 内联于值字段前 2 字节
-		_ = binary.Write(&b, bo, orientation)
+		_ = binary.Write(&b, bo, uint16(orientation))
 		_ = binary.Write(&b, bo, uint16(0))
 	} else { // LONG
 		_ = binary.Write(&b, bo, uint32(orientation))
@@ -42,7 +44,7 @@ func tiffWithOrientation(bo binary.ByteOrder, typ, orientation uint16) []byte {
 }
 
 // jpegWithExifOrientation 以 img 为主体拼装 SOI + APP1(Exif) + 主体熵编码的 JPEG
-func jpegWithExifOrientation(t *testing.T, img image.Image, bo binary.ByteOrder, typ, orientation uint16) []byte {
+func jpegWithExifOrientation(t *testing.T, img image.Image, bo binary.ByteOrder, typ uint16, orientation int) []byte {
 	t.Helper()
 	var body bytes.Buffer
 	if err := jpeg.Encode(&body, img, nil); err != nil {
@@ -160,48 +162,50 @@ func TestApplyOrientationAllDirections(t *testing.T) {
 	}
 }
 
-// ---- 集成:解码即转正 ----
+// ---- 集成:DrawImage 解码即转正(裁窗后置转正,见 DrawImage docblock) ----
 
-func TestDecodeOrientedJPEGRotated(t *testing.T) {
-	// orientation 6(旋转 90° 顺时针):8×16 上红下蓝 → 16×8 左蓝右红
-	src := image.NewNRGBA(image.Rect(0, 0, 8, 16))
-	for y := 0; y < 16; y++ {
-		for x := 0; x < 8; x++ {
-			if y < 8 {
-				src.SetNRGBA(x, y, red)
-			} else {
-				src.SetNRGBA(x, y, blue)
-			}
-		}
+func TestDrawImageOrientsExifRotatedJPEG(t *testing.T) {
+	// orientation 6(旋转 90° 顺时针):8×16 上红下蓝 → 观察方向 16×8 左蓝右红。
+	// 整图哨兵 blit 进与观察方向同尺寸的盒子,验收转正像素
+	path := twoBandExifJpeg(t, 6)
+
+	r := newSurfaceBackend(t)
+	if err := r.DrawImage(path, image.Rectangle{}, image.Rect(0, 0, 16, 8)); err != nil {
+		t.Fatalf("DrawImage: %v", err)
 	}
-	img, err := decodeOriented(jpegWithExifOrientation(t, src, binary.LittleEndian, 3, 6))
-	if err != nil {
-		t.Fatalf("decodeOriented: %v", err)
-	}
-	if img.Bounds().Dx() != 16 || img.Bounds().Dy() != 8 {
-		t.Fatalf("转正后尺寸 = %dx%d, want 16x8", img.Bounds().Dx(), img.Bounds().Dy())
+	img := r.End().(*image.NRGBA)
+	if img.Bounds().Dx() != 20 || img.Bounds().Dy() != 20 {
+		t.Fatalf("渲染面尺寸 = %dx%d, want 20x20", img.Bounds().Dx(), img.Bounds().Dy())
 	}
 	// JPEG 有损 + 色度抽样,取远离分界的点做容差取样
 	assertPixelNear(t, img, 0, 1, blue, 60)
 	assertPixelNear(t, img, 15, 6, red, 60)
 }
 
-func TestDecodeOrientedPNGUntouched(t *testing.T) {
-	// PNG 不携带 EXIF:原样解码
+func TestDrawImagePNGWithoutExifUntouched(t *testing.T) {
+	// PNG 不携带 EXIF:原样解码直通
 	src := image.NewNRGBA(image.Rect(0, 0, 6, 3))
 	draw.Draw(src, src.Bounds(), &image.Uniform{C: green}, image.Point{}, draw.Over)
-	img, err := decodeOriented(pngEncode(t, src))
-	if err != nil {
-		t.Fatalf("decodeOriented: %v", err)
+	path := filepath.Join(t.TempDir(), "plain.png")
+	if err := os.WriteFile(path, pngEncode(t, src), 0o644); err != nil {
+		t.Fatalf("写测试图: %v", err)
 	}
-	if img.Bounds().Dx() != 6 || img.Bounds().Dy() != 3 {
-		t.Fatalf("尺寸 = %dx%d, want 6x3", img.Bounds().Dx(), img.Bounds().Dy())
+
+	r := newSurfaceBackend(t)
+	if err := r.DrawImage(path, image.Rectangle{}, image.Rect(0, 0, 6, 3)); err != nil {
+		t.Fatalf("DrawImage: %v", err)
 	}
+	img := r.End().(*image.NRGBA)
 	assertPixel(t, img, 3, 1, green)
 }
 
-func TestDecodeOrientedGarbageAborts(t *testing.T) {
-	if _, err := decodeOriented([]byte("not an image")); err == nil {
+func TestDrawImageGarbageAborts(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "garbage.png")
+	if err := os.WriteFile(path, []byte("not an image"), 0o644); err != nil {
+		t.Fatalf("写垃圾测试图: %v", err)
+	}
+	r := newSurfaceBackend(t)
+	if err := r.DrawImage(path, image.Rectangle{}, image.Rect(0, 0, 5, 5)); err == nil {
 		t.Fatal("非法图片字节应报错")
 	}
 }

@@ -10,8 +10,8 @@ import (
 	"image"
 	"os"
 
-	// 内在尺寸探测按格式注册(ADR 0023 contain 臂):与位图后端解码集一致,
-	// stdlib 三格式——核心 module 纯 stdlib 红线不变,其余格式按读取失败降级 cover
+	// 内在尺寸探测按格式注册(ADR 0024 全 fit 前置):与位图后端解码集一致,
+	// stdlib 三格式——核心 module 纯 stdlib 红线不变,其余格式按读取失败退化 fill 形态
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
@@ -124,8 +124,10 @@ func (r *template) renderSurface(ctx context.Context, width, height int, layers 
 
 // paintBackground 背景铺装(ADR 0022 / spec §4):根层循环之前的唯一插入点,先色后图——
 // 背景之下无物(画布初始透明保留),背景图透明区露背景色。铺色复用 DrawRect 原语
-// (无边框),铺图复用 DrawImage 原语(整幅画布矩形 = cover 语义);背景图画布级
-// 惰性物化(绘制分派前、失败即抛、产物整体丢弃),无背景零开销
+// (无边框),铺图复用 DrawImage 原语;背景图画布级惰性物化(绘制分派前、失败即抛、
+// 产物整体丢弃),无背景零开销。铺装恒 cover(ADR 0022):分派点读内在尺寸算等比
+// 居中裁窗(与图片臂共用同一公式 CoverSourceWindow,ADR 0024)后 blit 进画布矩形,
+// 读取失败统一退化 fill 形态(真损坏图在后端解码抛,结局 parity)
 func (r *template) paintBackground(ctx context.Context, background *canvas.CanvasBackground, width, height int) error {
 	if background == nil {
 		return nil
@@ -137,15 +139,19 @@ func (r *template) paintBackground(ctx context.Context, background *canvas.Canva
 		}
 	}
 
-	image := background.Image
-	if image == nil {
+	bgImage := background.Image
+	if bgImage == nil {
 		return nil
 	}
-	src, err := r.resolver.ResolveBackground(ctx, *image)
+	src, err := r.resolver.ResolveBackground(ctx, *bgImage)
 	if err != nil {
 		return err
 	}
-	return r.backend.DrawImage(src, 0, 0, width, height)
+	dst := image.Rect(0, 0, width, height)
+	if iw, ih, ok := intrinsicSize(src); ok {
+		return r.backend.DrawImage(src, layer.CoverSourceWindow(width, height, iw, ih), dst)
+	}
+	return r.backend.DrawImage(src, image.Rectangle{}, dst)
 }
 
 // paint 在绝对坐标 (originX, originY) 处按图层自身定位设定绘制:
@@ -231,10 +237,14 @@ func (r *template) paintCell(ctx context.Context, l *layer.TableCellLayer, x, y 
 	return nil
 }
 
-// paintImage 图片图层:绘制分派前按需物化(spec §4.3,失败即抛渲染面丢弃),
-// 先画自身盒,再放置图片——contain(ADR 0023)按源图内在比例收缩矩形,cover
-// (缺省/未知值降级/尺寸读取失败)按内容区整铺。src 取 ResolvedSrc(物化结果
-// 优先,回退原始引用——本地路径零物化直画),引用为 nil 时只画盒
+// paintImage 图片臂全 fit 分派(ADR 0024 / spec §4):原语是双矩形 blit、零 fit 语义,
+// 四档 fit 的几何全部在此算定(白名单分派,未知值落 cover 臂)——
+// cover 等比居中裁窗 / fill 整图(与 cover 同门 dstRect,唯一差别在 srcRect)/
+// contain 收缩(ADR 0023 语义不动)/ tile 可见块逐块 blit。
+// 内在尺寸读取为全 fit 前置:绘制分派点一次(image.DecodeConfig 属绘制分派期 I/O,
+// 只读头块,与 resolve 同批语义;注册集 PNG/JPEG/GIF 与位图后端解码集一致),
+// 读取失败统一退化 fill 形态——真损坏图在后端解码处照旧报错,渲染结局与迁移前 parity。
+// src 取 ResolvedSrc(物化结果优先,回退原始引用——本地路径零物化直画),引用为 nil 时只画盒
 func (r *template) paintImage(ctx context.Context, l *layer.ImageLayer, x, y int) error {
 	if err := r.resolver.ResolveLayer(ctx, l); err != nil {
 		return err
@@ -248,35 +258,53 @@ func (r *template) paintImage(ctx context.Context, l *layer.ImageLayer, x, y int
 		return nil
 	}
 
-	// contain(ADR 0023):白名单在渲染臂——按物化后源图内在比例把目标矩形收缩成
-	// 等比矩形再调原语,原语签名与 cover 语义一字不动;内在尺寸读取失败落 cover 分支,
-	// 损坏图不因 fit 崩分派;未知 fit 值不在白名单,自然落 cover
-	if l.Fit() == layer.FitContain {
-		if cx, cy, cw, ch, ok := containRect(l, *src); ok {
-			return r.backend.DrawImage(*src, x+cx, y+cy, cw, ch)
-		}
+	// cover/fill 共用目标矩形(同门):getImageOrigin + 内容宽高
+	originX, originY := l.ImageOrigin()
+	dst := image.Rect(x+originX, y+originY, x+originX+l.ContentWidth(), y+originY+l.ContentHeight())
+
+	imgWidth, imgHeight, ok := intrinsicSize(*src)
+	if !ok {
+		// 内在尺寸不可用:整图拉伸进目标矩形(fill 形态),srcRect 零哨兵由后端按解码实际尺寸取整图
+		return r.backend.DrawImage(*src, image.Rectangle{}, dst)
 	}
 
-	originX, originY := l.ImageOrigin()
-	return r.backend.DrawImage(*src, x+originX, y+originY, l.ContentWidth(), l.ContentHeight())
+	switch l.Fit() {
+	case layer.FitContain:
+		// contain(ADR 0023):按内在比例收缩目标矩形再整图 blit
+		cx, cy, cw, ch := l.ContainRect(imgWidth, imgHeight)
+		return r.backend.DrawImage(*src, image.Rect(0, 0, imgWidth, imgHeight),
+			image.Rect(x+cx, y+cy, x+cx+cw, y+cy+ch))
+	case layer.FitTile:
+		// tile:可见块逐块 blit(src/dst 可见子矩形 1:1),裁切纯几何完成、原语零裁剪参数
+		for _, block := range l.TileRects(imgWidth, imgHeight) {
+			if err := r.backend.DrawImage(*src, block.Src, block.Dst.Add(image.Pt(x, y))); err != nil {
+				return err
+			}
+		}
+		return nil
+	case layer.FitFill:
+		// fill:整图进与 cover 相同的目标矩形(非等比拉伸,不裁切不留空隙)
+		return r.backend.DrawImage(*src, image.Rect(0, 0, imgWidth, imgHeight), dst)
+	default:
+		// cover(缺省/显式 cover 归一/未知值白名单外降级):等比居中裁窗
+		return r.backend.DrawImage(*src, l.CoverRect(imgWidth, imgHeight), dst)
+	}
 }
 
-// containRect 读物化后源图内在尺寸算收缩矩形。image.DecodeConfig 属绘制分派期 I/O
-// (只读头块,与 resolve 同批语义);打开/解码失败或非法尺寸(≤0)返回 ok=false,
-// 调用方按 cover 走。收缩与放置的纯几何在 layer.ImageLayer.ContainRect
-func containRect(l *layer.ImageLayer, src string) (cx, cy, cw, ch int, ok bool) {
+// intrinsicSize 源图内在尺寸(全 fit 前置,ADR 0024):绘制分派点一次读取,
+// 不可用(损坏/非图文件/零维)返回 ok=false——调用方统一退化 fill 形态
+func intrinsicSize(src string) (width, height int, ok bool) {
 	f, err := os.Open(src)
 	if err != nil {
-		return 0, 0, 0, 0, false
+		return 0, 0, false
 	}
 	defer f.Close()
 
 	cfg, _, err := image.DecodeConfig(f)
 	if err != nil || cfg.Width <= 0 || cfg.Height <= 0 {
-		return 0, 0, 0, 0, false
+		return 0, 0, false
 	}
-	cx, cy, cw, ch = l.ContainRect(cfg.Width, cfg.Height)
-	return cx, cy, cw, ch, true
+	return cfg.Width, cfg.Height, true
 }
 
 // paintText 文本图层:绘制分派前按需物化(须先于 Lines()——真实字体度量
@@ -330,7 +358,12 @@ func (r *template) paintQrCode(ctx context.Context, l *layer.QrCodeLayer, x, y i
 	if src == nil {
 		return nil
 	}
+	// 二维码内切于内容盒:边长 = min(内容区宽高)(quiet zone 语义,padding
+	// 留白即码外静区),对齐 + padding 定位(与 PHP 模板一致,镜像 paintImage 语义);
+	// QR 产物恒正方形(ADR 0015)、目标恒正方形——cover 窗 = 整图,srcRect 零哨兵
+	// 整图 blit、零内在尺寸读取(ADR 0024);边长 ≤0 由 blit 后端防护只画盒
 	originX, originY := l.QrOrigin()
 	side := l.ContentSide()
-	return r.backend.DrawImage(*src, x+originX, y+originY, side, side)
+	return r.backend.DrawImage(*src, image.Rectangle{},
+		image.Rect(x+originX, y+originY, x+originX+side, y+originY+side))
 }

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
 	"os"
 	"reflect"
 	"testing"
@@ -53,8 +54,10 @@ func (b *snapshotBackend) DrawRect(x, y, width, height int, _ *string, _ layer.B
 	return nil
 }
 
-func (b *snapshotBackend) DrawImage(_ string, x, y, width, height int) error {
-	b.records = append(b.records, snapshotRecord{Op: "image", X: x, Y: y, W: width, H: height})
+func (b *snapshotBackend) DrawImage(_ string, _, dstRect image.Rectangle) error {
+	b.records = append(b.records, snapshotRecord{
+		Op: "image", X: dstRect.Min.X, Y: dstRect.Min.Y, W: dstRect.Dx(), H: dstRect.Dy(),
+	})
 	return nil
 }
 

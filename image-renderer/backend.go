@@ -1,8 +1,9 @@
 // Package imagerenderer 核心包的位图渲染后端:以标准库 image 新建透明位图为
 // 渲染面,实现五个绘制原语接入渲染模板;承载 PNG/JPEG 解码、EXIF 转正、
-// cover 缩放裁切、文本绘制(opentype 字体 + 内置默认字体兜底)、二维码物化
-// (go-qrcode 适配,QRMaterializer 缝的默认接线)与 PNG 编码落盘。对应 PHP 侧
-// 的 php-canvas-image-renderer 包,End 产物为 *image.NRGBA。
+// blit 拉伸搬运(ADR 0024,源窗 → 目标矩形的像素搬运)、文本绘制(opentype
+// 字体 + 内置默认字体兜底)、二维码物化(go-qrcode 适配,QRMaterializer 缝的
+// 默认接线)与 PNG 编码落盘。对应 PHP 侧的 php-canvas-image-renderer 包,
+// End 产物为 *image.NRGBA。
 package imagerenderer
 
 import (
@@ -117,14 +118,20 @@ func borderBands(x, y, width, height int, border layer.Border) []edgeBand {
 	return bands
 }
 
-// DrawImage implements renderer.Backend:解码 → EXIF 转正 → cover 填满目标盒
-// → 放置于 (x, y)。宽/高 ≤0 直接跳过(PHP 同款守卫)
-func (r *Renderer) DrawImage(src string, x, y, width, height int) error {
+// DrawImage implements renderer.Backend(双矩形 blit,ADR 0024):解码 → 裁 srcRect
+// 源窗 → EXIF 转正 → 拉伸至 dstRect → 合成到渲染面。srcRect 空矩形是整图哨兵:
+// 按解码实际尺寸取整图(分派层内在尺寸不可用的退化形态,ADR 0024 接口契约);
+// dstRect 空矩形直接跳过(PHP dw/dh ≤0 防护同款,防护先于读取)。裁窗在内在坐标系
+// (与分派层 DecodeConfig 同系)进行、EXIF 转正后置——orientation 是恒距变换
+// (保居中、保比例),裁窗后转正与「转正后取对应窗」等价;拉伸无关等比(cover/fill
+// 的差别只在分派层给出的矩形形状)。防御:源窗与解码图不相交(分派层几何保证
+// 不发生,wire 可注入)时静默不画
+func (r *Renderer) DrawImage(src string, srcRect, dstRect image.Rectangle) error {
 	surface, err := r.face()
 	if err != nil {
 		return err
 	}
-	if width <= 0 || height <= 0 {
+	if dstRect.Empty() {
 		return nil
 	}
 
@@ -132,12 +139,28 @@ func (r *Renderer) DrawImage(src string, x, y, width, height int) error {
 	if err != nil {
 		return fmt.Errorf("读取图片 %s: %w", src, err)
 	}
-	img, err := decodeOriented(data)
+	raw, err := decode(data)
 	if err != nil {
 		return fmt.Errorf("解码图片 %s: %w", src, err)
 	}
-	covered := coverImage(img, width, height)
-	draw.Draw(surface, image.Rect(x, y, x+width, y+height), covered, image.Point{}, draw.Over)
+
+	region := srcRect
+	if region.Empty() {
+		region = raw.Bounds()
+	}
+	region = region.Intersect(raw.Bounds())
+	if region.Empty() {
+		return nil
+	}
+
+	cropped := image.NewNRGBA(image.Rect(0, 0, region.Dx(), region.Dy()))
+	draw.Draw(cropped, cropped.Bounds(), raw, region.Min, draw.Over)
+	if o := exifOrientation(data); o != 1 {
+		cropped = applyOrientation(cropped, o)
+	}
+
+	stretched := scaleImage(cropped, dstRect.Dx(), dstRect.Dy())
+	draw.Draw(surface, dstRect, stretched, image.Point{}, draw.Over)
 	return nil
 }
 

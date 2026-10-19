@@ -1,13 +1,15 @@
 package imagerenderer
 
-// fit 像素点位断言(ADR 0023,平移 php-canvas-image-renderer ImageRendererTest
-// fit 组用例):contain 等比收缩后空隙透明露下层与盒背景、收缩矩形按 align + padding
-// 放置(非恒居中)、cover 缺省与未知 fit 值降级零回归、损坏图按 cover 走结局等价。
+// fit 像素点位断言(ADR 0023/0024,平移 php-canvas-image-renderer ImageRendererTest
+// fit 组用例与 spec §8 T2 点位清单):contain 等比收缩后空隙透明露下层与盒背景、
+// 收缩矩形按 align + padding 放置(非恒居中)、cover/contain 回归、fill 拉伸形变、
+// tile 网格锚定/截断/空隙、未知 fit 值降级与损坏图渲染结局等价。
 // 无黄金文件约定,点位取样即验收面;经公开渲染管线(模板 → 位图后端)驱动
 
 import (
 	"context"
 	"encoding/json"
+	"image"
 	"image/color"
 	"os"
 	"path/filepath"
@@ -20,8 +22,11 @@ import (
 // magenta 品红(下层透出用例的源图左半色)
 var magenta = color.NRGBA{R: 0xFF, G: 0x00, B: 0xFF, A: 0xFF}
 
+// cyan 青(四象限标定图右下象限)
+var cyan = color.NRGBA{R: 0x00, G: 0xFF, B: 0xFF, A: 0xFF}
+
 // fitViaWire 经 wire 往返给图片图层注入 spec.fit(模拟第三方手写 graph:显式 cover /
-// 未知枚举值的透传形态,不经 SetFit 归一门)
+// 白名单外枚举串的透传形态,不经 SetFit 归一门)
 func fitViaWire(t *testing.T, l *layer.ImageLayer, fit string) *layer.ImageLayer {
 	t.Helper()
 	raw, err := json.Marshal(l.Graph())
@@ -34,6 +39,27 @@ func fitViaWire(t *testing.T, l *layer.ImageLayer, fit string) *layer.ImageLayer
 	}
 	node.Spec.Fit = &fit
 	return layer.ImageFromGraph(node)
+}
+
+// quadPng 四象限标定图:TL/TR/BL/BR 各占 1/4(tile 网格点位用色块定位)
+func quadPng(t *testing.T, width, height int, tl, tr, bl, br color.NRGBA) string {
+	t.Helper()
+	img := image.NewNRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			switch {
+			case y < height/2 && x < width/2:
+				img.SetNRGBA(x, y, tl)
+			case y < height/2:
+				img.SetNRGBA(x, y, tr)
+			case x < width/2:
+				img.SetNRGBA(x, y, bl)
+			default:
+				img.SetNRGBA(x, y, br)
+			}
+		}
+	}
+	return writePngFixture(t, img)
 }
 
 func TestContainLeavesGapShowingLayerBoxBackground(t *testing.T) {
@@ -112,18 +138,134 @@ func TestContainPlacesShrunkRectByAlignAndPadding(t *testing.T) {
 	assertPixel(t, img, 40, 39, white)
 }
 
+func TestFillStretchesIntoContentBoxWithoutCropOrGap(t *testing.T) {
+	// fill 拉伸形变(ADR 0024):40×10 上下分带图(上红下蓝,行切分)非等比拉伸进
+	// 20×20 白底盒——不裁切不留空隙,分界线压中(y=10);cover 会裁中部横带(全红)、
+	// contain 会留空隙,均与此点位不同(取样点远离分界,避开插值过渡带)
+	banded := image.NewNRGBA(image.Rect(0, 0, 40, 10))
+	for y := 0; y < 10; y++ {
+		for x := 0; x < 40; x++ {
+			if y < 5 {
+				banded.SetNRGBA(x, y, red)
+			} else {
+				banded.SetNRGBA(x, y, blue)
+			}
+		}
+	}
+
+	l := layer.NewImageLayer(
+		layer.WithSize(20, 20),
+		layer.WithBackground("#ffffff"),
+		layer.WithImage(writePngFixture(t, banded)),
+	)
+	l.SetFit(layer.FitFill)
+	img := renderLayerProduct(t, l)
+
+	assertPixel(t, img, 10, 3, red)
+	assertPixel(t, img, 0, 7, red)
+	assertPixel(t, img, 19, 0, red)
+	assertPixel(t, img, 10, 13, blue)
+	assertPixel(t, img, 0, 12, blue)
+	assertPixel(t, img, 19, 19, blue)
+}
+
+func TestTileAnchorsGridAndTruncatesAtContentBox(t *testing.T) {
+	// tile 网格(ADR 0024):40×40 四象限单元进 100×50 透明盒(center)→ 首块锚定
+	// (30,5) 网格整体居中,右/下溢出半块截断(末行末列半块),锚点前空隙透明露下层
+	unit := quadPng(t, 40, 40, red, green, blue, cyan)
+
+	l := layer.NewImageLayer(layer.WithSize(100, 50), layer.WithImage(unit))
+	l.SetFit(layer.FitTile)
+	img := renderLayerProduct(t, l)
+
+	// 首块 (30,5)-(70,45):四象限按 1:1 落位
+	assertPixel(t, img, 31, 6, red)
+	assertPixel(t, img, 69, 6, green)
+	assertPixel(t, img, 31, 44, blue)
+	assertPixel(t, img, 69, 44, cyan)
+	// 末列半块 (70,5)-(100,45):源窗 x∈[0,30),图案重新从源左缘开始
+	assertPixel(t, img, 70, 6, red)
+	assertPixel(t, img, 99, 44, cyan)
+	// 末行半块 (30,45)-(70,50):源窗 y∈[0,5)
+	assertPixel(t, img, 31, 45, red)
+	assertPixel(t, img, 69, 49, green)
+	// 角块 (70,45)-(100,50):源窗 x∈[0,30) y∈[0,5)
+	assertPixel(t, img, 70, 45, red)
+	assertPixel(t, img, 99, 49, green)
+	// 空隙透明露下层:锚点左侧、锚线上方、末行左段
+	assertPixel(t, img, 29, 10, clear)
+	assertPixel(t, img, 50, 4, clear)
+	assertPixel(t, img, 10, 49, clear)
+}
+
+func TestTileRightAlignLeavesGapOnLeft(t *testing.T) {
+	// align=right/top:首块贴右、锚点前空隙透明露下层,下方照常补行
+	unit := quadPng(t, 40, 40, red, green, blue, cyan)
+
+	l := layer.NewImageLayer(
+		layer.WithSize(100, 50),
+		layer.WithImage(unit),
+		layer.WithHorizontalAlign(layer.AlignRight),
+		layer.WithVerticalAlign(layer.AlignTop),
+	)
+	l.SetFit(layer.FitTile)
+	img := renderLayerProduct(t, l)
+
+	assertPixel(t, img, 60, 0, red)
+	assertPixel(t, img, 99, 9, green)
+	// 锚点前空隙(左侧整条)
+	assertPixel(t, img, 59, 10, clear)
+	assertPixel(t, img, 0, 0, clear)
+	// 下方补行(末行半块,源窗 y∈[0,10))
+	assertPixel(t, img, 60, 40, red)
+	assertPixel(t, img, 99, 49, green)
+}
+
+func TestTileLargeImageNegativeAnchorRevealsMiddle(t *testing.T) {
+	// 大图 center:锚点为负露出图片中部,可见块只有网格首块的中部子矩形,
+	// 无空隙(网格 ∩ 内容盒 = 内容盒)
+	wide := twoColorPng(t, 120, 80, red, green, 60)
+
+	l := layer.NewImageLayer(layer.WithSize(100, 50), layer.WithImage(wide))
+	l.SetFit(layer.FitTile)
+	img := renderLayerProduct(t, l)
+
+	// src 窗 (10,15)-(110,65):分界线 src x=60 → dst x=50,四角满铺
+	assertPixel(t, img, 0, 0, red)
+	assertPixel(t, img, 49, 25, red)
+	assertPixel(t, img, 50, 25, green)
+	assertPixel(t, img, 99, 49, green)
+}
+
+func TestCoverExtremeAspectRatioWindowDegradesToWholeImage(t *testing.T) {
+	// 极端宽高比:20×100 竖图进 100×4 横带,cover 窗向零截断得零高(位移公式
+	// 不钳制,对齐 PHP intval)——零矩形落整图哨兵,后端按解码实际尺寸整图拉伸
+	// (旧 coverImage 的 ≥1 钳制语义不移植,ADR 0024 哨兵契约接管)
+	tall := twoColorPng(t, 20, 100, red, blue, 10)
+
+	l := layer.NewImageLayer(layer.WithSize(100, 4), layer.WithBackground("#ffffff"), layer.WithImage(tall))
+	img := renderLayerProduct(t, l)
+
+	// 整图拉伸:左右分界压中(x=50)、纵向满铺(取样点远离分界,避开插值过渡带)
+	assertPixel(t, img, 25, 2, red)
+	assertPixel(t, img, 75, 2, blue)
+	assertPixel(t, img, 25, 0, red)
+	assertPixel(t, img, 75, 3, blue)
+}
+
 func TestUnknownFitValueAndExplicitCoverRenderSamePixelsAsCover(t *testing.T) {
 	// 渲染面降级零回归(点位与 TestImageIsCoverCroppedIntoContentBox 一致):
 	// 未知 fit 值(白名单在渲染臂,wire 透传保存)与显式 cover(归一缺省态)
-	// 都按 cover 原路径渲染
+	// 都按 cover 原路径渲染。fill/tile 已转正(ADR 0024),白名单外示例改用
+	// 从未入册的值
 	wide := twoColorPng(t, 40, 10, red, blue, 20)
 
 	// 未知值经 wire 透传(往返恒等),渲染按 cover 降级
 	l := fitViaWire(t,
 		layer.NewImageLayer(layer.WithSize(20, 20), layer.WithBackground("#ffffff"), layer.WithImage(wide)),
-		"fill")
-	if got := l.Fit(); got != "fill" {
-		t.Fatalf("解码后 Fit() = %q, want fill(透传)", got)
+		"flip")
+	if got := l.Fit(); got != "flip" {
+		t.Fatalf("解码后 Fit() = %q, want flip(透传)", got)
 	}
 	img := renderLayerProduct(t, l)
 	assertPixel(t, img, 5, 10, red)
@@ -137,19 +279,19 @@ func TestUnknownFitValueAndExplicitCoverRenderSamePixelsAsCover(t *testing.T) {
 	assertPixel(t, img, 15, 10, blue)
 }
 
-func TestCorruptedImageWithContainFollowsCoverPathExactly(t *testing.T) {
-	// 损坏图 + contain 降级走 cover 路径(ADR 0023):渲染结局与无 fit 的 cover
-	// 完全一致——fit 臂 DecodeConfig 读取失败不新增异常面(两端不可解码文件的
-	// 结局都收敛到 DrawImage 的解码失败,故断言 outcome 等价而非具体错误文案)
+func TestCorruptedImageRendersSameOutcomeAcrossAllFits(t *testing.T) {
+	// 损坏图统一退化 fill 形态(ADR 0024):内在尺寸读取失败后白名单四档与未知值
+	// 全部走同一零哨兵分派,渲染结局与无 fit 的 cover 完全一致——两端不可解码文件
+	// 的结局都收敛到 DrawImage 的解码失败,故断言 outcome 等价而非具体错误文案
 	src := filepath.Join(t.TempDir(), "broken.png")
 	if err := os.WriteFile(src, []byte("definitely-not-an-image"), 0o644); err != nil {
 		t.Fatalf("写损坏测试图: %v", err)
 	}
 
-	outcome := func(contain bool) string {
+	outcome := func(fit string) string {
 		l := layer.NewImageLayer(layer.WithSize(100, 50), layer.WithBackground("#ffffff"), layer.WithImage(src))
-		if contain {
-			l.SetFit(layer.FitContain)
+		if fit != "" {
+			l.SetFit(fit)
 		}
 		product, err := newRenderer(t).RenderLayer(context.Background(), l)
 		if err != nil {
@@ -159,7 +301,10 @@ func TestCorruptedImageWithContainFollowsCoverPathExactly(t *testing.T) {
 		return "image: bounds " + img.Bounds().String()
 	}
 
-	if got, want := outcome(true), outcome(false); got != want {
-		t.Errorf("损坏图 contain 渲染结局必须与 cover 完全一致:\n contain = %s\n cover   = %s", got, want)
+	baseline := outcome("")
+	for _, fit := range []string{layer.FitCover, layer.FitContain, layer.FitFill, layer.FitTile, "flip"} {
+		if got := outcome(fit); got != baseline {
+			t.Errorf("损坏图 fit=%s 渲染结局必须与 cover 完全一致:\n fit = %s\n cover = %s", fit, got, baseline)
+		}
 	}
 }

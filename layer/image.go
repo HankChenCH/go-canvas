@@ -1,16 +1,24 @@
 package layer
 
-import "math"
+import (
+	"image"
+	"math"
+)
 
 // ImageLayer 图片图层:只记录资源原始引用(URL 或本地路径),
 // 下载与物化由渲染前的 ResourceResolver 统一完成——构造与 setter 不做任何 I/O。
 
-// 适配模式取值(ADR 0023):cover 铺满裁切(缺省)= 等比缩放铺满内容盒、溢出居中裁切;
-// contain 完整显示 = 等比缩放至恰好完整落入内容盒、按对齐放置,空隙透明。
-// v1 已知值仅 contain;未知值宽容保存(渲染面按 cover 降级,白名单在渲染臂)
+// 适配模式取值(ADR 0023/0024):cover 铺满裁切(缺省)= 等比缩放铺满内容盒、
+// 溢出居中裁切;contain 完整显示 = 等比缩放至恰好完整落入内容盒、按对齐放置,
+// 空隙透明;fill 拉伸铺满 = 非等比缩放至恰好铺满内容盒,不裁切不留空隙(不保源图
+// 宽高比);tile 平铺 = 按内在尺寸 1:1 原尺寸重复铺放,首块按对齐锚定、向右下
+// 无限重复、止于网格 ∩ 内容盒(末行末列半块截断,见根 CONTEXT.md「平铺(tile)」词条)。
+// 未知值宽容保存(渲染面按 cover 降级,白名单在渲染臂)
 const (
 	FitCover   = "cover"
 	FitContain = "contain"
+	FitFill    = "fill"
+	FitTile    = "tile"
 )
 
 // ImageLayer 图片图层
@@ -99,13 +107,86 @@ func (l *ImageLayer) ImageOrigin() (int, int) {
 // ContainRect contain 收缩矩形(ADR 0023):按源图内在比例把内容盒收缩成等比矩形——
 // 两维同一缩放系数取 min(内容宽比, 内容高比),长边贴内容盒;放置按对齐 + padding
 // 与 ImageOrigin 同门公式。纯布局计算,渲染端共用;内在尺寸由调用方读取
-// (读取失败按 cover 走),非法尺寸(≤0)不进本函数,收缩结果 ≤0 由后端
-// DrawImage 防护只画盒
+// (读取失败统一退化 fill 形态,ADR 0024),非法尺寸(≤0)不进本函数,
+// 收缩结果 ≤0 由后端 DrawImage 防护只画盒
 func (l *ImageLayer) ContainRect(imgWidth, imgHeight int) (int, int, int, int) {
 	scale := math.Min(float64(l.ContentWidth())/float64(imgWidth), float64(l.ContentHeight())/float64(imgHeight))
 	width := int(float64(imgWidth) * scale)
 	height := int(float64(imgHeight) * scale)
 	return l.alignedX(width), l.alignedY(height), width, height
+}
+
+// CoverRect cover 等比居中裁窗(ADR 0024):源图坐标系里与内容盒同宽高比的窗口,
+// 窗外部分被裁切不绘制——与 ContainRect 同门的纯布局函数(box/scale 公式互为
+// max/min 镜像),cover 窗公式唯一实例落包级 CoverSourceWindow。对齐不进源窗
+// (cover 恒居中裁),padding 经内容盒收缩间接收窄窗口;内在尺寸由调用方读取,
+// 非法尺寸(≤0)不进本函数
+func (l *ImageLayer) CoverRect(imgWidth, imgHeight int) image.Rectangle {
+	return CoverSourceWindow(l.ContentWidth(), l.ContentHeight(), imgWidth, imgHeight)
+}
+
+// CoverSourceWindow cover 裁窗公式唯一落点(ADR 0024):图片臂(内容盒)与画布
+// 背景臂(画布矩形)共用同一公式防数学漂移;boxWidth×boxHeight 为目标矩形
+// (无 padding 语义时传整盒)。整除向零截断对齐 PHP intval
+func CoverSourceWindow(boxWidth, boxHeight, imgWidth, imgHeight int) image.Rectangle {
+	scale := math.Max(float64(boxWidth)/float64(imgWidth), float64(boxHeight)/float64(imgHeight))
+	windowWidth := int(float64(boxWidth) / scale)
+	windowHeight := int(float64(boxHeight) / scale)
+
+	return image.Rect(
+		int(float64(imgWidth-windowWidth)/2),
+		int(float64(imgHeight-windowHeight)/2),
+		int(float64(imgWidth-windowWidth)/2)+windowWidth,
+		int(float64(imgHeight-windowHeight)/2)+windowHeight,
+	)
+}
+
+// TileBlock tile 可见块(ADR 0024):src 为源图坐标的可见子矩形、dst 为图层盒
+// 坐标的落位矩形,两矩形同尺寸(可见子矩形 1:1 映射)
+type TileBlock struct {
+	Src image.Rectangle
+	Dst image.Rectangle
+}
+
+// TileRects tile 可见块矩形组(ADR 0024):单元 = 内在尺寸 1:1 零参数,首块左上
+// 锚定于对齐 + padding(与 ImageOrigin/ContainRect 同一 aligned 公式——小图 center
+// 网格整体居中、大图 center 锚点为负露出图片中部),网格自首块向右向下无限延伸,
+// 绘制面 = 网格 ∩ 内容盒:末行末列半块截断、锚点未覆盖处空隙透明露下层。
+// 行主序返回;可见块数不设上限(静默截断是语义意外)。纯布局计算;
+// 内在尺寸由调用方读取,非法尺寸(≤0)不进本函数(Go 侧防御 0 步进死循环返回 nil)
+func (l *ImageLayer) TileRects(imgWidth, imgHeight int) []TileBlock {
+	if imgWidth <= 0 || imgHeight <= 0 {
+		return nil
+	}
+
+	anchorX := l.alignedX(imgWidth)
+	anchorY := l.alignedY(imgHeight)
+	left := int(l.padding.Left)
+	top := int(l.padding.Top)
+	right := left + l.ContentWidth()
+	bottom := top + l.ContentHeight()
+
+	blocks := []TileBlock{}
+	for y := anchorY; y < bottom; y += imgHeight {
+		dstY := max(y, top)
+		dstHeight := min(y+imgHeight, bottom) - dstY
+		if dstHeight <= 0 {
+			continue
+		}
+		for x := anchorX; x < right; x += imgWidth {
+			dstX := max(x, left)
+			dstWidth := min(x+imgWidth, right) - dstX
+			if dstWidth <= 0 {
+				continue
+			}
+			blocks = append(blocks, TileBlock{
+				Src: image.Rect(dstX-x, dstY-y, dstX-x+dstWidth, dstY-y+dstHeight),
+				Dst: image.Rect(dstX, dstY, dstX+dstWidth, dstY+dstHeight),
+			})
+		}
+	}
+
+	return blocks
 }
 
 // alignedX 对齐放置横向公式(align + padding 同门):placedWidth 尺寸的内容在

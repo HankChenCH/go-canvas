@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	"testing"
 
 	"github.com/HankChenCH/go-canvas/canvas"
@@ -52,7 +53,9 @@ func TestRenderPaintsBackgroundColorBeforeLayers(t *testing.T) {
 }
 
 func TestRenderPaintsBackgroundImageCoverOnTopOfColor(t *testing.T) {
-	// 先色后图:背景图整幅 cover(透明区露色),均在根层之前
+	// 先色后图:背景图铺满画布矩形(透明区露色),均在根层之前。
+	// /tmp/local.png 不在盘上:内在尺寸读取失败退化 fill 形态,srcRect 走零哨兵,
+	// dstRect 与 cover 几何同门(ADR 0024)
 	content := layer.NewImageLayer(layer.WithSize(20, 10))
 	backend := &fakeBackend{}
 	r := newRenderer(t, backend)
@@ -63,9 +66,31 @@ func TestRenderPaintsBackgroundImageCoverOnTopOfColor(t *testing.T) {
 	}
 
 	assertOps(t, backend.ops, []string{"begin", "rect", "image", "rect", "end"})
-	if img := backend.images[0]; img.src != "/tmp/local.png" ||
-		img.x != 0 || img.y != 0 || img.w != 320 || img.h != 240 {
-		t.Errorf("背景图绘制 = %+v, want 本地路径整幅 cover (0,0,320,240)", img)
+	if img := backend.images[0]; img.src != "/tmp/local.png" || !img.srcRect.Empty() ||
+		img.dstRect != (image.Rect(0, 0, 320, 240)) {
+		t.Errorf("背景图绘制 = {src %s, srcRect %s, dstRect %s}, want (/tmp/local.png, 零哨兵, (0,0)-(320,240))",
+			img.src, img.srcRect, img.dstRect)
+	}
+}
+
+func TestRenderPaintsBackgroundImageAsProportionalCenterCropWindow(t *testing.T) {
+	// 背景臂恒 cover(ADR 0022/0024):分派点读内在尺寸算等比居中裁窗后 blit——
+	// 40×40 方图铺 320×240 画布 → 中部横带窗(scale = 8,窗 40×30,sy = 5)
+	bg := writeSolidPng(t, 40, 40)
+	content := layer.NewImageLayer(layer.WithSize(20, 10))
+	backend := &fakeBackend{}
+	r := newRenderer(t, backend)
+
+	if _, err := r.Render(context.Background(),
+		backgroundedCanvas(t, strp("#ffffff"), strp(bg), content)); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+
+	assertOps(t, backend.ops, []string{"begin", "rect", "image", "rect", "end"})
+	if img := backend.images[0]; img.src != bg || img.srcRect != (image.Rect(0, 5, 40, 35)) ||
+		img.dstRect != (image.Rect(0, 0, 320, 240)) {
+		t.Errorf("背景图绘制 = {src %s, srcRect %s, dstRect %s}, want cover 窗 (0,5)-(40,35) → 整幅画布",
+			img.src, img.srcRect, img.dstRect)
 	}
 }
 

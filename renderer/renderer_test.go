@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	"testing"
 
 	"github.com/HankChenCH/go-canvas/canvas"
@@ -26,8 +27,9 @@ type rectCall struct {
 }
 
 type imageCall struct {
-	src        string
-	x, y, w, h int
+	src     string
+	srcRect image.Rectangle
+	dstRect image.Rectangle
 }
 
 type textCall struct {
@@ -70,9 +72,9 @@ func (f *fakeBackend) DrawRect(x, y, width, height int, bgColor *string, border 
 	return f.drawRectErr
 }
 
-func (f *fakeBackend) DrawImage(src string, x, y, width, height int) error {
+func (f *fakeBackend) DrawImage(src string, srcRect, dstRect image.Rectangle) error {
 	f.ops = append(f.ops, "image")
-	f.images = append(f.images, imageCall{src, x, y, width, height})
+	f.images = append(f.images, imageCall{src, srcRect, dstRect})
 	return nil
 }
 
@@ -261,10 +263,13 @@ func TestImageLayerDrawsRectThenContentAtContentOrigin(t *testing.T) {
 		t.Errorf("rect = (%d, %d, %d, %d), want (2, 3, 100, 100)", rect.x, rect.y, rect.w, rect.h)
 	}
 	img := backend.images[0]
-	// 起点 = 原点 + padding(left/top 取 padding 值);尺寸 = 内容盒 80×80
-	if img.src != "pic-local.png" || img.x != 12 || img.y != 13 || img.w != 80 || img.h != 80 {
-		t.Errorf("image = (%s, %d, %d, %d, %d), want (pic-local.png, 12, 13, 80, 80)",
-			img.src, img.x, img.y, img.w, img.h)
+	// 起点 = 原点 + padding(left/top 取 padding 值);尺寸 = 内容盒 80×80。
+	// pic-local.png 不在盘上:内在尺寸读取失败退化 fill 形态,srcRect 走零哨兵,
+	// dstRect 与 cover 几何同门(ADR 0024)
+	if img.src != "pic-local.png" || !img.srcRect.Empty() ||
+		img.dstRect != (image.Rect(12, 13, 92, 93)) {
+		t.Errorf("image = (%s, srcRect %s, dstRect %s), want (pic-local.png, 零哨兵, (12,13)-(92,93))",
+			img.src, img.srcRect, img.dstRect)
 	}
 }
 
@@ -342,9 +347,11 @@ func TestQrCodeLayerPlacedSquareByWidth(t *testing.T) {
 	if rect := backend.rects[0]; rect.x != 1 || rect.y != 1 || rect.w != 30 || rect.h != 50 {
 		t.Errorf("rect = (%d, %d, %d, %d), want (1, 1, 30, 50)", rect.x, rect.y, rect.w, rect.h)
 	}
-	if img := backend.images[0]; img.src != "/tmp/qr.png" || img.x != 1 || img.y != 1 || img.w != 30 || img.h != 30 {
-		t.Errorf("image = (%s, %d, %d, %d, %d), want (/tmp/qr.png, 1, 1, 30, 30)",
-			img.src, img.x, img.y, img.w, img.h)
+	// QR 臂(ADR 0024):产物恒正方形、目标恒正方形——srcRect 零哨兵整图 blit、零尺寸读取
+	if img := backend.images[0]; img.src != "/tmp/qr.png" || !img.srcRect.Empty() ||
+		img.dstRect != (image.Rect(1, 1, 31, 31)) {
+		t.Errorf("image = (%s, srcRect %s, dstRect %s), want (/tmp/qr.png, 零哨兵, (1,1)-(31,31))",
+			img.src, img.srcRect, img.dstRect)
 	}
 }
 
@@ -361,9 +368,10 @@ func TestQrCodePaddingLeavesQuietZone(t *testing.T) {
 	if _, err := r.RenderLayer(context.Background(), qr); err != nil {
 		t.Fatalf("RenderLayer: %v", err)
 	}
-	if img := backend.images[0]; img.src != "/tmp/qr.png" || img.x != 21 || img.y != 21 || img.w != 60 || img.h != 60 {
-		t.Errorf("image = (%s, %d, %d, %d, %d), want (/tmp/qr.png, 21, 21, 60, 60)",
-			img.src, img.x, img.y, img.w, img.h)
+	if img := backend.images[0]; img.src != "/tmp/qr.png" || !img.srcRect.Empty() ||
+		img.dstRect != (image.Rect(21, 21, 81, 81)) {
+		t.Errorf("image = (%s, srcRect %s, dstRect %s), want (/tmp/qr.png, 零哨兵, (21,21)-(81,81))",
+			img.src, img.srcRect, img.dstRect)
 	}
 }
 
@@ -379,8 +387,10 @@ func TestQrCodeCenteredInNonSquareBox(t *testing.T) {
 	if _, err := r.RenderLayer(context.Background(), qr); err != nil {
 		t.Fatalf("RenderLayer: %v", err)
 	}
-	if img := backend.images[0]; img.x != 21 || img.y != 1 || img.w != 60 || img.h != 60 {
-		t.Errorf("image = (%d, %d, %d, %d), want (21, 1, 60, 60)", img.x, img.y, img.w, img.h)
+	if img := backend.images[0]; img.src != "/tmp/qr.png" || !img.srcRect.Empty() ||
+		img.dstRect != (image.Rect(21, 1, 81, 61)) {
+		t.Errorf("image = (%s, srcRect %s, dstRect %s), want (/tmp/qr.png, 零哨兵, (21,1)-(81,61))",
+			img.src, img.srcRect, img.dstRect)
 	}
 }
 

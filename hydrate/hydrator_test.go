@@ -217,7 +217,7 @@ func TestFitPassesThroughHydrateUntouched(t *testing.T) {
 	marked.SetExpression("{{orderNo}}")
 	marked.SetFit(layer.FitContain)
 	static := layer.NewImageLayer(layer.WithSize(60, 60), layer.WithImage("/tmp/static.png"))
-	static.SetFit("fill")
+	static.SetFit("flip") // 白名单外值(fill/tile 已转正,ADR 0024)
 
 	hydrated, err := hydrate.NewHydrator(nil).Hydrate(
 		canvas.New(320, 100, marked, static), dataset())
@@ -242,11 +242,11 @@ func TestFitPassesThroughHydrateUntouched(t *testing.T) {
 	}
 
 	second := layers[1].(*layer.ImageLayer)
-	if got := second.Fit(); got != "fill" {
-		t.Errorf("静态图片 Fit() = %q, want fill(未知值透传)", got)
+	if got := second.Fit(); got != "flip" {
+		t.Errorf("静态图片 Fit() = %q, want flip(白名单外值透传)", got)
 	}
-	if got := graph.Layers[1].Spec.Fit; got == nil || *got != "fill" {
-		t.Errorf("hydrate 后 wire spec.fit = %v, want fill", got)
+	if got := graph.Layers[1].Spec.Fit; got == nil || *got != "flip" {
+		t.Errorf("hydrate 后 wire spec.fit = %v, want flip", got)
 	}
 }
 

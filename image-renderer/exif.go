@@ -92,7 +92,7 @@ func parseTIFFOrientation(tiff []byte) int {
 // applyOrientation 按 EXIF orientation 把图像转正到观察方向:
 // 2/4 镜像、3 旋转 180°、6/8 旋转 90°、5/7 沿对角镜像(宽高互换)。
 // orientation 由 exifOrientation 保证在 1–8;逐像素搬运 NRGBA,零失真
-func applyOrientation(src image.Image, orientation int) image.Image {
+func applyOrientation(src image.Image, orientation int) *image.NRGBA {
 	n := toNRGBA(src)
 	b := n.Bounds()
 	sw, sh := b.Dx(), b.Dy()

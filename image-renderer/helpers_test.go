@@ -4,9 +4,11 @@ package imagerenderer
 // pixel/assertPixelSame 与 twoColorPng/solidPng;像素取样即验收面)
 
 import (
+	"encoding/binary"
 	"image"
 	"image/color"
 	"image/draw"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -49,6 +51,28 @@ func assertPixelNear(t *testing.T, img image.Image, x, y int, want color.NRGBA, 
 			t.Errorf("像素 (%d, %d) %s = %d, 与 %d 相差超容差 %d", x, y, ch.name, ch.g, ch.w, tol)
 		}
 	}
+}
+
+// twoBandExifJpeg 8×16 上红下蓝、带指定 EXIF orientation 的 JPEG 落盘
+// (EXIF 转正/裁窗次序测试共用夹具)
+func twoBandExifJpeg(t *testing.T, orientation int) string {
+	t.Helper()
+	img := image.NewNRGBA(image.Rect(0, 0, 8, 16))
+	for y := 0; y < 16; y++ {
+		for x := 0; x < 8; x++ {
+			if y < 8 {
+				img.SetNRGBA(x, y, red)
+			} else {
+				img.SetNRGBA(x, y, blue)
+			}
+		}
+	}
+	path := filepath.Join(t.TempDir(), "exif-rotated.jpg")
+	if err := os.WriteFile(path,
+		jpegWithExifOrientation(t, img, binary.LittleEndian, 3, orientation), 0o644); err != nil {
+		t.Fatalf("写 EXIF 测试图: %v", err)
+	}
+	return path
 }
 
 // writePngFixture 把测试图落盘为 PNG,返回路径(模拟物化后的本地图片)

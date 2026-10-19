@@ -1,6 +1,8 @@
 package renderer
 
 import (
+	"image"
+
 	"github.com/HankChenCH/go-canvas/layer"
 )
 
@@ -18,8 +20,13 @@ type Backend interface {
 	// bgColor 为 nil 跳过填充;边框四边逐边可 nil(结构对齐 graph 的 shape.border)
 	DrawRect(x, y, width, height int, bgColor *string, border layer.Border) error
 
-	// DrawImage 绘制图片:src 为物化后的本地路径,缩放裁切至 width×height 后放置于 (x, y)
-	DrawImage(src string, x, y, width, height int) error
+	// DrawImage 绘制图片(双矩形 blit,ADR 0024):把 src(物化后的本地路径)中
+	// srcRect 矩形(源图内在尺寸坐标系)拉伸搬运至 dstRect 矩形。原语零 fit 语义、
+	// 零内在尺寸读取——cover 裁窗 / contain 收缩 / fill 整图 / tile 网格全部是
+	// 渲染模板分派层的纯几何(与 PHP 权威端 paintImage 同构)。
+	// srcRect 为空矩形是整图哨兵:按解码后实际尺寸取整图(分派层内在尺寸不可用的
+	// 退化形态,接口契约的组成部分);dstRect 空矩形后端防护不画
+	DrawImage(src string, srcRect, dstRect image.Rectangle) error
 
 	// DrawText 绘制单行文本,(x, y) 为 align 语义下的锚点;
 	// fontFile 为物化后的字体路径,空串/纯数字表示渲染端内置默认字体

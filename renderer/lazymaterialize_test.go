@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	"testing"
 
 	"github.com/HankChenCH/go-canvas/canvas"
@@ -49,9 +50,9 @@ func (b *loggingBackend) DrawRect(x, y, w, h int, bg *string, border layer.Borde
 	return b.fakeBackend.DrawRect(x, y, w, h, bg, border)
 }
 
-func (b *loggingBackend) DrawImage(src string, x, y, w, h int) error {
+func (b *loggingBackend) DrawImage(src string, srcRect, dstRect image.Rectangle) error {
 	*b.events = append(*b.events, "image")
-	return b.fakeBackend.DrawImage(src, x, y, w, h)
+	return b.fakeBackend.DrawImage(src, srcRect, dstRect)
 }
 
 func (b *loggingBackend) DrawText(line string, x, y int, fontFile string, fontSize int, fontColor, horizontalAlign, verticalAlign string, angle int) error {

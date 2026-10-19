@@ -10,15 +10,10 @@ import (
 	_ "image/png"
 )
 
-// decodeOriented 解码图片字节并按 EXIF orientation 转正到观察方向。
-// 仅 JPEG 携带 EXIF,其余格式原样返回
-func decodeOriented(data []byte) (image.Image, error) {
+// decode 解码图片字节到内在坐标系(未按 EXIF 转正)。blit 的 srcRect 源窗与
+// 分派层 image.DecodeConfig 同处内在坐标系(ADR 0024),转正由 DrawImage 在
+// 裁窗后执行(裁窗 → 转正的次序理由见其 docblock)
+func decode(data []byte) (image.Image, error) {
 	img, _, err := image.Decode(bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	if o := exifOrientation(data); o != 1 {
-		return applyOrientation(img, o), nil
-	}
-	return img, nil
+	return img, err
 }
