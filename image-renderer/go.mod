@@ -3,7 +3,7 @@ module github.com/HankChenCH/go-canvas/image-renderer
 go 1.25.0
 
 require (
-	github.com/HankChenCH/go-canvas v1.4.0
+	github.com/HankChenCH/go-canvas v1.5.0
 	github.com/go-text/typesetting v0.3.5
 	github.com/yeqown/go-qrcode/v2 v2.3.0
 	github.com/yeqown/go-qrcode/writer/standard v1.4.0
