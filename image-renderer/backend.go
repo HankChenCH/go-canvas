@@ -20,7 +20,8 @@ import (
 	"golang.org/x/image/font"
 )
 
-// Renderer 位图渲染后端:实现 renderer.Backend,产物为透明底 *image.NRGBA。
+// Renderer 位图渲染后端:实现 renderer.Backend 与可选形状能力口
+// renderer.ShapeCapableBackend(ADR 0026),产物为透明底 *image.NRGBA。
 // 同一实例可跨多次渲染复用,Begin 即重置渲染面。**非并发安全**:字体 Face
 // 按渲染会话(实例)持有(opentype.Face 与渲染面位图均非并发安全),并发
 // 渲染请各自 New
@@ -34,6 +35,7 @@ type Renderer struct {
 }
 
 var _ renderer.Backend = (*Renderer)(nil)
+var _ renderer.ShapeCapableBackend = (*Renderer)(nil)
 
 // New 构造位图渲染后端
 func New() *Renderer { return &Renderer{} }
@@ -135,13 +137,55 @@ func (r *Renderer) DrawImage(src string, srcRect, dstRect image.Rectangle) error
 		return nil
 	}
 
+	stretched, err := blitSource(src, srcRect, dstRect)
+	if err != nil {
+		return err
+	}
+	if stretched == nil {
+		return nil
+	}
+	draw.Draw(surface, dstRect, stretched, image.Point{}, draw.Over)
+	return nil
+}
+
+// DrawImageMasked implements renderer.ShapeCapableBackend(掩码 blit 原语,ADR 0026,
+// DrawImage 的掩码形态):双矩形 blit(语义与 DrawImage 完全一致,含 srcRect 空矩形
+// 整图哨兵)后以 maskRect 外接矩形的内切椭圆为掩码裁切,掩码外透明——分派层传
+// 正方形即圆。掩码矩形是画布绝对坐标,与目标矩形独立(换算到目标坐标系后超出
+// 部分自然落在目标位图界外)。dstRect/maskRect 空矩形防护不画
+func (r *Renderer) DrawImageMasked(src string, srcRect, dstRect, maskRect image.Rectangle) error {
+	surface, err := r.face()
+	if err != nil {
+		return err
+	}
+	if dstRect.Empty() || maskRect.Empty() {
+		return nil
+	}
+
+	stretched, err := blitSource(src, srcRect, dstRect)
+	if err != nil {
+		return err
+	}
+	if stretched == nil {
+		return nil
+	}
+
+	applyEllipseMask(stretched, maskRect.Sub(dstRect.Min))
+	draw.Draw(surface, dstRect, stretched, image.Point{}, draw.Over)
+	return nil
+}
+
+// blitSource blit 共享前段(DrawImage/DrawImageMasked 同源):解码 → 裁 srcRect
+// 源窗 → EXIF 转正 → 拉伸至 dstRect 尺寸;源窗与解码图不相交返回 nil
+// (静默不画,调用方跳过合成),其余错误随通道返回
+func blitSource(src string, srcRect, dstRect image.Rectangle) (*image.NRGBA, error) {
 	data, err := os.ReadFile(src)
 	if err != nil {
-		return fmt.Errorf("读取图片 %s: %w", src, err)
+		return nil, fmt.Errorf("读取图片 %s: %w", src, err)
 	}
 	raw, err := decode(data)
 	if err != nil {
-		return fmt.Errorf("解码图片 %s: %w", src, err)
+		return nil, fmt.Errorf("解码图片 %s: %w", src, err)
 	}
 
 	region := srcRect
@@ -150,7 +194,7 @@ func (r *Renderer) DrawImage(src string, srcRect, dstRect image.Rectangle) error
 	}
 	region = region.Intersect(raw.Bounds())
 	if region.Empty() {
-		return nil
+		return nil, nil
 	}
 
 	cropped := image.NewNRGBA(image.Rect(0, 0, region.Dx(), region.Dy()))
@@ -159,9 +203,7 @@ func (r *Renderer) DrawImage(src string, srcRect, dstRect image.Rectangle) error
 		cropped = applyOrientation(cropped, o)
 	}
 
-	stretched := scaleImage(cropped, dstRect.Dx(), dstRect.Dy())
-	draw.Draw(surface, dstRect, stretched, image.Point{}, draw.Over)
-	return nil
+	return scaleImage(cropped, dstRect.Dx(), dstRect.Dy()), nil
 }
 
 // fillRect 以 Over 合成填充矩形(后画者覆盖先画者,对齐图层叠加语义);

@@ -21,6 +21,14 @@ const (
 	FitTile    = "tile"
 )
 
+// 裁剪形状取值(ADR 0026):两档——矩形(rect,缺省不裁)与圆形(circle,内切圆)。
+// 圆形档是完整圆形框:背景色填充进圆、内容按 fit 绘出后遮罩进圆、边框沿圆周描成环。
+// 未知值宽容保存(渲染面按矩形降级,白名单在渲染臂)
+const (
+	ClipRect   = "rect"
+	ClipCircle = "circle"
+)
+
 // ImageLayer 图片图层
 type ImageLayer struct {
 	base
@@ -30,7 +38,10 @@ type ImageLayer struct {
 	expression *string
 	// fit 适配模式声明(ADR 0023):静态声明不参与数据表达式,只影响绘制、
 	// 不影响盒子布局;空串 = cover 缺省,未知值原样透传
-	fit         string
+	fit string
+	// clip 裁剪形状声明(ADR 0026):静态声明不参与数据表达式,只影响绘制、
+	// 不影响盒子布局;空串 = rect 缺省,未知值原样透传
+	clip        string
 	resolvedSrc *string
 }
 
@@ -89,6 +100,18 @@ func (l *ImageLayer) SetFit(fit string) {
 // Fit 适配模式声明原文;空串 = cover 缺省(渲染面未知值按 cover 降级,白名单在渲染臂)
 func (l *ImageLayer) Fit() string { return l.fit }
 
+// SetClip 声明裁剪形状(ADR 0026):与 src/fit 正交(改图/打标/解标均不扰动);
+// rect 显式声明归一空串缺省态,保条件写键字节面(fit 显式 cover 归一先例)
+func (l *ImageLayer) SetClip(clip string) {
+	if clip == ClipRect {
+		clip = ""
+	}
+	l.clip = clip
+}
+
+// Clip 裁剪形状声明原文;空串 = rect 缺省(渲染面未知值按矩形降级,白名单在渲染臂)
+func (l *ImageLayer) Clip() string { return l.clip }
+
 // ResolvedSrc 渲染实际可用的图片来源:优先物化结果,回退原始引用
 func (l *ImageLayer) ResolvedSrc() *string {
 	if l.resolvedSrc != nil {
@@ -139,6 +162,40 @@ func CoverSourceWindow(boxWidth, boxHeight, imgWidth, imgHeight int) image.Recta
 		int(float64(imgWidth-windowWidth)/2)+windowWidth,
 		int(float64(imgHeight-windowHeight)/2)+windowHeight,
 	)
+}
+
+// InscribedCircleRect 内切圆矩形(ADR 0026):边长 = min(内容区宽高),按盒内对齐
+// 定位(alignedX/alignedY 同门公式——center 取整盒中点、left/top 贴 padding 原点侧),
+// 内边距即框外留白;非方盒恒正方几何(渲染面即正圆),不变形为椭圆。
+// 纯布局计算,与 ContainRect/QrOrigin 同门;边长 ≤0(内容区被 padding 吃满)
+// 由渲染臂防护不画。返回图层盒坐标的正方矩形(宽恒等于高)
+func (l *ImageLayer) InscribedCircleRect() image.Rectangle {
+	side := min(l.ContentWidth(), l.ContentHeight())
+	x := l.alignedX(side)
+	y := l.alignedY(side)
+	return image.Rect(x, y, x+side, y+side)
+}
+
+// CircleStroke 圆周描边参数解析(ADR 0026):宽取四边已声明宽的最小值、颜色按
+// top→right→bottom→left 取首个非空边色、四边全未声明不描边(规则明文在根
+// CONTEXT.md「裁剪形状(clip shape)」词条)。纯函数,返回边框边目同款形态;
+// 未声明或 width≤0(wire 解码可注入)的边不计——与渲染端 borderBands 同纪律
+func (l *ImageLayer) CircleStroke() *BorderSide {
+	declared := make([]*BorderSide, 0, 4)
+	for _, side := range []*BorderSide{l.border.Top, l.border.Right, l.border.Bottom, l.border.Left} {
+		if side != nil && side.Width > 0 {
+			declared = append(declared, side)
+		}
+	}
+	if len(declared) == 0 {
+		return nil
+	}
+
+	width := declared[0].Width
+	for _, side := range declared[1:] {
+		width = min(width, side.Width)
+	}
+	return &BorderSide{Width: width, Color: declared[0].Color}
 }
 
 // TileBlock tile 可见块(ADR 0024):src 为源图坐标的可见子矩形、dst 为图层盒
@@ -225,7 +282,9 @@ func (l *ImageLayer) TypeName() string { return TypeImage }
 // Graph 序列化为 wire 节点;data 条件写键:标记态三键(ExpressionValue),
 // 未标记两键(StaticValue,无 expression 键);fit 条件写键(ADR 0023):
 // 缺省(cover)整键不落、缺省态字节面与无字段版本一致,落键殿后 spec 末位
-// (shape/align/position/fit);未知值原样透传保往返恒等——保 Go↔PHP 字节 parity
+// (shape/align/position/fit);clip 条件写键(ADR 0026):缺省(rect)整键不落、
+// 殿后 spec 末位 fit 之后(键序 shape/align/position/fit/clip);未知值原样透传
+// 保往返恒等——保 Go↔PHP 字节 parity
 func (l *ImageLayer) Graph() Node {
 	n := l.base.wireNode(TypeImage)
 	if l.expression != nil {
@@ -237,16 +296,24 @@ func (l *ImageLayer) Graph() Node {
 		fit := l.fit
 		n.Spec.Fit = &fit
 	}
+	if l.clip != "" {
+		clip := l.clip
+		n.Spec.Clip = &clip
+	}
 	return n
 }
 
 // ImageFromGraph 由 wire 节点重建图片图层(工厂 FromGraph 的图片分支)。
-// fit 宽容读(ADR 0023):无键回填缺省,显式 cover 归一空串,未知值原样透传
+// fit 宽容读(ADR 0023):无键回填缺省,显式 cover 归一空串,未知值原样透传;
+// clip 宽容读(ADR 0026):无键回填缺省,显式 rect 归一空串,未知值原样透传
 func ImageFromGraph(n Node) *ImageLayer {
 	l := NewImageLayer()
 	l.applyNode(n)
 	if n.Spec.Fit != nil {
 		l.SetFit(*n.Spec.Fit)
+	}
+	if n.Spec.Clip != nil {
+		l.SetClip(*n.Spec.Clip)
 	}
 	if n.Data != nil {
 		if n.Data.ValueType == ValueTypeExpression && n.Data.Expression != nil {
