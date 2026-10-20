@@ -32,7 +32,40 @@ func (r *Renderer) DrawImage(src string, srcRect, dstRect image.Rectangle) error
 	if dstRect.Empty() {
 		return nil
 	}
+	return r.embedBlit(doc, src, srcRect, dstRect, func(doc *fpdf.Fpdf) {
+		doc.ClipRect(
+			float64(dstRect.Min.X)*pxToPt, float64(dstRect.Min.Y)*pxToPt,
+			float64(dstRect.Dx())*pxToPt, float64(dstRect.Dy())*pxToPt,
+			false,
+		)
+	})
+}
 
+// DrawImageMasked implements renderer.ShapeCapableBackend(掩码 blit 原语,ADR 0026,
+// DrawImage 的掩码形态):双矩形 blit(语义与 DrawImage 完全一致,含 srcRect 空矩形
+// 整图哨兵)后以 maskRect 外接矩形的内切椭圆为掩码裁切,掩码外不画——分派层传
+// 正方形即圆。矢量承接 = ClipEllipse 替位既有 ClipRect(ADR 0026),直嵌零重编码
+// 与放置矩阵机制全复用(embedBlit 共享主体);掩码矩形是画布绝对坐标,与目标矩形
+// 独立,裁剪路径在未入放置矩阵的用户空间施加。dstRect/maskRect 空矩形防护不画
+func (r *Renderer) DrawImageMasked(src string, srcRect, dstRect, maskRect image.Rectangle) error {
+	doc, err := r.docf()
+	if err != nil {
+		return err
+	}
+	if dstRect.Empty() || maskRect.Empty() {
+		return nil
+	}
+	return r.embedBlit(doc, src, srcRect, dstRect, func(doc *fpdf.Fpdf) {
+		cx, cy, rx, ry := inscribedEllipse(maskRect)
+		doc.ClipEllipse(cx, cy, rx, ry, false)
+	})
+}
+
+// embedBlit 直嵌 blit 共享主体(DrawImage/DrawImageMasked 同源):读取 → 魔数
+// 嗅探 → 内在尺寸 → srcRect 源窗与放置矩阵 P 算定 → 直嵌注册 → 调用臂给定的
+// 裁剪原语内发射放置矩阵与整幅图。裁剪闭包在 TransformBegin 之前调用——双空间
+// 纪律:fpdf 裁剪/变换入参恒用户空间(内部自换算),矩阵换算归 placeAffine
+func (r *Renderer) embedBlit(doc *fpdf.Fpdf, src string, srcRect, dstRect image.Rectangle, clip func(*fpdf.Fpdf)) error {
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("读取图片 %s: %w", src, err)
@@ -74,11 +107,7 @@ func (r *Renderer) DrawImage(src string, srcRect, dstRect image.Rectangle) error
 	}
 	P := W.after(T)
 
-	doc.ClipRect(
-		float64(dstRect.Min.X)*pxToPt, float64(dstRect.Min.Y)*pxToPt,
-		float64(dstRect.Dx())*pxToPt, float64(dstRect.Dy())*pxToPt,
-		false,
-	)
+	clip(doc)
 	doc.TransformBegin()
 	r.placeAffine(doc, P)
 	// 整幅图按内在尺寸入坐标(矩阵负责裁窗与映射),放置点恒 (0,0) 不为负
@@ -90,6 +119,16 @@ func (r *Renderer) DrawImage(src string, srcRect, dstRect image.Rectangle) error
 		return fmt.Errorf("绘制图片 %s: %w", src, doc.Error())
 	}
 	return nil
+}
+
+// inscribedEllipse 矩形的内切椭圆(fpdf ClipEllipse 入参形态:圆心 + 半轴)。
+// 像素空间算定后统一 ×pxToPt 发射——掩码 = 椭圆内切于给定矩形的唯一几何落点
+func inscribedEllipse(r image.Rectangle) (cx, cy, rx, ry float64) {
+	cx = (float64(r.Min.X) + float64(r.Dx())/2) * pxToPt
+	cy = (float64(r.Min.Y) + float64(r.Dy())/2) * pxToPt
+	rx = float64(r.Dx()) / 2 * pxToPt
+	ry = float64(r.Dy()) / 2 * pxToPt
+	return cx, cy, rx, ry
 }
 
 // affine 2×3 仿射矩阵(y 向下坐标系,先 x 后 y 的行向量约定):
