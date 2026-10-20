@@ -19,15 +19,17 @@ else
 endif
 endif
 
-.PHONY: test vet layout-snapshot visual-check
+.PHONY: test vet layout-snapshot visual-check visual-check-pdf
 
 test:
 	go test ./...
 	cd image-renderer && go test ./...
+	cd pdf-renderer && go test ./...
 
 vet:
 	go vet ./...
 	cd image-renderer && go vet ./...
+	cd pdf-renderer && go vet ./...
 
 layout-snapshot:
 	$(PHP) ../php-canvas-next/scripts/export-layout-snapshot.php renderer/testdata/layout-snapshot.json
@@ -37,3 +39,9 @@ layout-snapshot:
 # 缺省产物 image-renderer/visual-check.png(已 gitignore),可传 OUTPUT= 覆写
 visual-check:
 	cd image-renderer && go run ./cmd/visualcheck $(OUTPUT)
+	cd pdf-renderer && go run ./cmd/visualcheck $(OUTPUT)
+
+# PDF 目验:综合样张出 .pdf + pdftoppm 预览 png(poppler 四件套,依赖见
+# pdf-renderer/AGENTS.md);缺省产物 pdf-renderer/visual-check.pdf/.png
+visual-check-pdf:
+	cd pdf-renderer && go run ./cmd/visualcheck $(OUTPUT)
