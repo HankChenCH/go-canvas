@@ -14,6 +14,7 @@ import (
 	"fmt"
 
 	"github.com/HankChenCH/go-canvas/layer"
+	"github.com/HankChenCH/go-canvas/renderer"
 	"github.com/HankChenCH/go-canvas/resolver"
 
 	"github.com/go-pdf/fpdf"
@@ -44,11 +45,9 @@ type Renderer struct {
 	defaultResolver *resolver.ResourceResolver
 }
 
-var _ interface {
-	Begin(width, height int) error
-	End() any
-	DrawRect(x, y, width, height int, bgColor *string, border layer.Border) error
-} = (*Renderer)(nil)
+// 编译期全量契约断言:直接对 renderer.Backend 断言,五个绘制原语签名齐备才算
+// 实现(匿名接口只点名三方法,DrawImage/DrawText 的签名漂移会漏检)
+var _ renderer.Backend = (*Renderer)(nil)
 
 // New 构造 PDF 渲染后端(不带默认物化器;经 NewRenderer 组装即完整管线)
 func New() *Renderer { return &Renderer{} }
@@ -113,11 +112,11 @@ func (r *Renderer) emit() any {
 	if r.doc.Err() {
 		return nil
 	}
-	var buf growthBuffer
+	var buf bytes.Buffer
 	if err := r.doc.Output(&buf); err != nil {
 		return nil
 	}
-	return buf.bytes()
+	return buf.Bytes()
 }
 
 // DrawRect implements renderer.Backend:背景色 + 四边边框。
@@ -196,13 +195,4 @@ func borderBands(x, y, width, height int, border layer.Border) []edgeBand {
 		bands = append(bands, edgeBand{s, rectXY(max(x, x+width-s.Width), y, x+width, y+height)})
 	}
 	return bands
-}
-
-// growthBuffer End 的产物缓冲:bytes.Buffer 补 bytes() 取值小件
-type growthBuffer struct {
-	bytes.Buffer
-}
-
-func (b *growthBuffer) bytes() []byte {
-	return b.Bytes()
 }

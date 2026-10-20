@@ -6,7 +6,7 @@ go-canvas 的 PDF 渲染后端(嵌套 module `github.com/HankChenCH/go-canvas/pd
 
 ## Layout
 
-- `backend.go` — Renderer 会话(Begin/End/DrawRect)+ 几何/颜色小件:`pxToPt`(96dpi,pt = px × 0.75,页 MediaBox/坐标/字号一律 ×0.75)、`borderBands`(盒内嵌色带,序 top/bottom/left/right,与 image-renderer 同一公式)、`growthBuffer`。Begin 是**文档续页语义**:首次建档、文档已在则 AddPageFormat 续页(单文档连续性,多页入口工票 03 逐页 Begin);End 防御性复查文档错误位,宁可无产物不可出半成品,**且一次性终结会话**(doc 与字体注册表复位)——End 后同一实例复用(单页/多页入口皆然)必须得到干净新文档,不得续进旧文档(工票 03 验收锁定);渲染失败路径 End 不达,失败后实例不复用(渲染面已弃,重试请各自 New)。
+- `backend.go` — Renderer 会话(Begin/End/DrawRect)+ 几何/颜色小件:`pxToPt`(96dpi,pt = px × 0.75,页 MediaBox/坐标/字号一律 ×0.75)、`borderBands`(盒内嵌色带,序 top/bottom/left/right,与 image-renderer 同一公式)。Begin 是**文档续页语义**:首次建档、文档已在则 AddPageFormat 续页(单文档连续性,多页入口工票 03 逐页 Begin);End 防御性复查文档错误位,宁可无产物不可出半成品,**且一次性终结会话**(doc 与字体注册表复位)——End 后同一实例复用(单页/多页入口皆然)必须得到干净新文档,不得续进旧文档(工票 03 验收锁定);渲染失败路径 End 不达,失败后实例不复用(渲染面已弃,重试请各自 New)。
 - `renderpages.go` — 多页入口(工票 03):`RenderPages`(便捷具体入口,`*Renderer` + 页序列直出 `[]byte`)与 `RenderPagesAs[T]`(泛型断言,镜像核心 renderas.go 消费面;断言发生在渲染成功后,用法错误不设 code)。编排归核心 `renderer.RenderPages`(工票 01),本文件只做后端接线与产物断言;`assertProduct` 为核心未导出辅助的本 module 自组件。
 - `color.go` — `rgba` + `parseColor`(hex 四形态,非法输入报错中止;image-renderer color.go 同式复制,两后端防线对称)。
 - `decode.go` — 内在尺寸探测(DecodeConfig,三格式注册)+ `sniffType` 魔数嗅探(扩展名不可信,直嵌 ImageType 用嗅探结果)。
