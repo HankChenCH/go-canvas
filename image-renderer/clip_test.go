@@ -7,7 +7,6 @@ package imagerenderer
 // circle × fit 四档正交组合;未知 clip 值降级矩形。
 // 描边带采样点取缘内缩留过渡带余量(Go 内描带 [r-w, r] 与 PHP 居中带
 // [r-w/2, r+w/2] 的公共区),经公开渲染管线(模板 → 位图后端)驱动
-
 import (
 	"context"
 	"image"
@@ -102,7 +101,7 @@ func TestClipCircleImageMaskedIntoCircleCoverFit(t *testing.T) {
 func TestClipCircleBorderStrokesRingAlongCircumference(t *testing.T) {
 	// 环带描边:padding 12 → 内切圆 side 76 center (50,50) r=38,border 宽 8 蓝——
 	// Go 内描带 [30,38](与 DrawRect 盒内嵌边带同门),采样半径 ≈36(r - w/4)取
-	// GD 内描带与 Imagick 居中带公共区跨驱可平移;环内露背景白、环外与四角露下层红
+	// GD 内描带与 Imagick 居中带公共区跨驱动可平移;环内露背景白、环外与四角露下层红
 	// (padding 即环外留白)
 	src := solidPng(t, 40, 40, color.NRGBA{R: 0x12, G: 0x34, B: 0x56, A: 0xFF})
 	lower := layer.NewImageLayer(layer.WithSize(100, 100), layer.WithBackground("#f00"), layer.WithPriority(10))

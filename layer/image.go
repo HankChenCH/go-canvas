@@ -167,10 +167,15 @@ func CoverSourceWindow(boxWidth, boxHeight, imgWidth, imgHeight int) image.Recta
 // InscribedCircleRect 内切圆矩形(ADR 0026):边长 = min(内容区宽高),按盒内对齐
 // 定位(alignedX/alignedY 同门公式——center 取整盒中点、left/top 贴 padding 原点侧),
 // 内边距即框外留白;非方盒恒正方几何(渲染面即正圆),不变形为椭圆。
-// 纯布局计算,与 ContainRect/QrOrigin 同门;边长 ≤0(内容区被 padding 吃满)
-// 由渲染臂防护不画。返回图层盒坐标的正方矩形(宽恒等于高)
+// 纯布局计算,与 ContainRect/QrOrigin 同门;边长 ≤0(内容区被 padding 吃满或
+// 超吃)归零矩形——Go image.Rect 会规范化交换 Min/Max,负边长的原始形态
+// (PHP 返回 [x, y, -side, -side]、渲染臂 $side <= 0 拦截)在 Go 不可表达,
+// 防线前移到本函数;渲染臂空矩形防护照旧(PHP 同位双门)
 func (l *ImageLayer) InscribedCircleRect() image.Rectangle {
 	side := min(l.ContentWidth(), l.ContentHeight())
+	if side <= 0 {
+		return image.Rectangle{}
+	}
 	x := l.alignedX(side)
 	y := l.alignedY(side)
 	return image.Rect(x, y, x+side, y+side)

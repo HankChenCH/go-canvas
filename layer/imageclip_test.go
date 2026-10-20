@@ -169,6 +169,12 @@ func TestInscribedCircleRectMatrix(t *testing.T) {
 		{"非对称 padding center", 100, 50, "center", "center", 20, 10, 5, 0, image.Rect(37, 12, 62, 37)},
 		{"非对称 padding left", 100, 50, "left", "center", 20, 10, 5, 0, image.Rect(0, 12, 25, 37)},
 		{"非对称 padding top", 100, 50, "center", "top", 20, 10, 5, 0, image.Rect(37, 20, 62, 45)},
+		// 反例域(非法输入防线随矩阵平移):内容区恰被 padding 吃满(side=0)与超吃
+		// (side<0)均归零矩形——Go image.Rect 会规范化交换 Min/Max,负边长须在
+		// 构造前归零,渲染臂空矩形防护才不会被翻正矩形绕过(PHP 数组无规范化,
+		// 由渲染臂 $side <= 0 拦截,两端防线同效不同位)
+		{"padding 恰好吃满", 40, 40, "center", "center", 20, 20, 20, 20, image.Rectangle{}},
+		{"padding 超吃", 40, 40, "center", "center", 25, 25, 25, 25, image.Rectangle{}},
 	}
 
 	for _, tc := range cases {
@@ -224,4 +230,12 @@ func TestCircleStrokeParsingMatrix(t *testing.T) {
 	// 全边同值:宽色一致
 	assertStroke(t, layer.NewImageLayer(layer.WithSize(100, 100), layer.WithBorder(4, "#abc")),
 		&layer.BorderSide{Width: 4, Color: "#abc"})
+
+	// 反例域(wire 可注入负宽):width≤0 的边不计——与渲染端 borderBands 同纪律。
+	// PHP array_filter 仅滤 null(负宽边会计入),Go 防线更紧属已声明同型分歧
+	// (PHP setter 层 width=0 同归 null,分歧仅在手写 wire 域)
+	negative := layer.NewImageLayer(layer.WithSize(100, 100), layer.WithBorderTop(-1, "#f00"))
+	if got := negative.CircleStroke(); got != nil {
+		t.Errorf("负宽边应不计: CircleStroke() = %+v, want nil", *got)
+	}
 }
