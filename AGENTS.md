@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Go 移植版画布渲染库 `github.com/HankChenCH/go-canvas`：与 `php-canvas-next`（PHP 权威端，本地同级 `../php-canvas-next`）共享同一领域语言与 graph wire 契约——`layer.Node` 逐字段键级对齐 PHP 各图层 `graph()` 产物，同一份 graph JSON 双端互读。核心 module **纯 stdlib 零第三方依赖**（ADR-0002）；位图后端是嵌套 module `image-renderer/`（消费方走 module proxy 解析核心已发布 tag，本地双 module 联调经仓库根 `go.work`）。Go 1.25。中文是代码注释的工作语言；commit 用 conventional-commit 前缀 + 中文 subject。
+Go 移植版画布渲染库 `github.com/HankChenCH/go-canvas`：与 `php-canvas-next`（PHP 权威端，本地同级 `../php-canvas-next`）共享同一领域语言与 graph wire 契约——`layer.Node` 逐字段键级对齐 PHP 各图层 `graph()` 产物，同一份 graph JSON 双端互读。核心 module **纯 stdlib 零第三方依赖**（ADR-0002）；渲染后端是嵌套 module `image-renderer/`（位图）与 `pdf-renderer/`（PDF）（消费方走 module proxy 解析核心已发布 tag，本地双 module 联调经仓库根 `go.work`）。Go 1.25。中文是代码注释的工作语言；commit 用 conventional-commit 前缀 + 中文 subject。
 
 ## Layout
 
@@ -17,15 +17,16 @@ Go 移植版画布渲染库 `github.com/HankChenCH/go-canvas`：与 `php-canvas-
 - `resolver/` — 资源物化（下载/缓存/QR 缝），结果回写图层（`SetResolvedSrc/SetResolvedFont`）；画布级入口 `ResolveBackground`（背景图不是图层，物化结果以返回值交渲染器，img_layers 同目录同语义）。`Resolve` 全画布预遍历 API 保留但渲染器不再调用（角色 = 绘制时物化）。
 - `text/` — 断行/度量契约 + 对齐版默认实现；注入点在 `layer.TextLayer`。
 - `image-renderer/` — 嵌套 module：位图后端（`imagerenderer.Renderer` 实现 Backend；`NewRenderer` 返回携带默认物化器——二维码缝默认接线——的具体后端，配 `RenderAs` 即完整管线）+ `typography/` 增强文本 + `cmd/visualcheck` 目验样图。
+- `pdf-renderer/` — 嵌套 module：PDF 后端（`pdfrenderer.Renderer` 实现 Backend，End 产物 `[]byte`；`NewRenderer` 镜像位图后端默认接线）。px→pt ×0.75、PNG/JPEG/GIF 直嵌（clip + 放置矩阵）、TTF 子集内嵌文本（TTC 不支持，兜底 = 核心字体 Helvetica）、EXIF 经放置矩阵归正；Begin 文档续页语义为工票 03 多页入口预留。poppler 验收四件套与字体陷阱见包内 AGENTS.md；`cmd/visualcheck` 出 .pdf + 预览 png。
 - 语义语料（工票 07 起消费翻转）：语料仓 `canvas-semantics` 以 **submodule pin** 进仓（语义权威，PHP/Go/TS 三端平等消费，语料 diff 即语义变更、升级 = 一次可审的指针移动），runner 直接读 `canvas-semantics/corpus/`：`hydrate/corpus_test.go`（expression-eval v3.0 四模块 107 用例 + fn-date 内 dateTokens 15 行（v3.0 = 提案 0002 季度 token Q 收编），token 表表面对 = `hydrate/dateformat_test.go`；expand-semantics v1.1 = 29 用例，expect.warnings 软诊断序列比对 = code + path + 序列序）、`paginate/semantics_test.go`（paginate-semantics v1.0 = 12 用例 + flow-semantics v1.1 = 23 用例含软诊断面），随常规 `go test` 运行。**fresh clone 先 `git submodule update --init`**（runner 未检出即红，无降级路径）。支持面声明 = 仓根 `support-surface.json`（渲染端四契约全模块，声明即 runner 套件必须绿；CI core job 以语料仓内 canvasctl `validate --surface` 三互检，工票 08）。`renderer/testdata/layout-snapshot.json` 是布局快照（wire 字节面，PHP 导出、非语料），见 `docs/layout-snapshot.md`。
 
 ## Commands
 
 ```sh
-make test             # 核心 module + image-renderer 两轮 go test(含语义语料 runner,需先检出 submodule)
+make test             # 核心 module + image-renderer + pdf-renderer 三轮 go test(含语义语料 runner,需先检出 submodule)
 make vet
 make layout-snapshot  # PHP 导出布局快照（需 PHP 8.3 + ext-intl），人审 diff 后随代码提交
-make visual-check     # 目验样图 → image-renderer/visual-check.png
+make visual-check     # 目验样图:位图 → image-renderer/visual-check.png;PDF → pdf-renderer/visual-check.pdf(+png 预览,poppler 在场)
 ```
 
 fresh clone 先 `git submodule update --init`（语料仓未检出 runner 即红）。Homebrew PHP 是 keg-only：`export PATH="$(brew --prefix)/opt/php@8.3/bin:$PATH"`（仅 `make layout-snapshot` 需要）。Go CI 不装 PHP——语义语料经 submodule 检出，布局快照 JSON 提交进本仓库、仅人工触发再生成。
