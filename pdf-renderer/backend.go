@@ -24,10 +24,12 @@ import (
 const pxToPt = 0.75
 
 // Renderer PDF 渲染后端:实现 renderer.Backend,产物为 PDF 文档字节 []byte
-// (经 renderer.RenderAs[[]byte] 消费)。实例即一个 PDF 文档会话:首次 Begin
-// 建档,后续 Begin 同一文档续页(单文档连续性,多页入口工票 03 逐页 Begin);
-// 独立的单页渲染请各自 New。**非并发安全**:fpdf 实例按渲染会话(实例)持有
-// 且非并发安全,并发渲染请各自 New
+// (经 renderer.RenderAs[[]byte] 消费,多页经 renderer.RenderPages / 本 module
+// RenderPages 消费)。实例即一个 PDF 文档会话:首次 Begin 建档,后续 Begin
+// 同一文档续页(单文档连续性,多页入口工票 03 逐页 Begin);End 产出即终结
+// 会话——doc 与字体注册表一并复位,同一实例再次渲染(无论单页还是多页入口)
+// 必然得到干净新文档,不会把页面追加进旧文档(工票 03 验收锁定)。**非并发
+// 安全**:fpdf 实例按渲染会话(实例)持有且非并发安全,并发渲染请各自 New
 type Renderer struct {
 	doc    *fpdf.Fpdf // Begin 建立的 PDF 文档(会话内单文档连续性,多页逐页 AddPage)
 	width  int        // 渲染面宽(px,页面几何换算基准)
@@ -92,11 +94,22 @@ func (r *Renderer) Begin(width, height int) error {
 // End implements renderer.Backend:全程内存构建,Output 到字节缓冲即 PDF 产物;
 // 未建面返回 nil 接口(非 typed nil)。绘制期任一原语报错时模板即中止、End
 // 不达(失败路径无产物逃逸);此处仍防御性复查文档错误位——错误 sticky 的
-// fpdf 在流残缺时也可能"完成"输出,宁可无产物不可出半成品
+// fpdf 在流残缺时也可能"完成"输出,宁可无产物不可出半成品。
+// End 一次性终结文档会话:无论产出与否,doc 与字体注册表一并复位——Begin 的
+// 「文档已在则续页」分支只应活在单次渲染会话内(多页逐页 Begin),End 后实例
+// 复用必须从建档起步,否则第二次渲染把页面追加进旧文档
 func (r *Renderer) End() any {
 	if r.doc == nil {
 		return nil
 	}
+	product := r.emit()
+	r.doc = nil   // 会话复位:再次 Begin 即建档新文档(End 后复用语义,工票 03)
+	r.fonts = nil // 字体注册随文档会话走:族名映射只在注册进当前文档后有意义,新文档须重新注册
+	return product
+}
+
+// emit 产物发射:错误位复查 + Output 到内存缓冲;任一失败返回 nil(无产物逃逸)
+func (r *Renderer) emit() any {
 	if r.doc.Err() {
 		return nil
 	}
