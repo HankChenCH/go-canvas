@@ -29,14 +29,24 @@ import (
 )
 
 var (
-	red   = color.NRGBA{R: 0xFF, G: 0x00, B: 0x00, A: 0xFF}
-	green = color.NRGBA{R: 0x00, G: 0xFF, B: 0x00, A: 0xFF}
-	blue  = color.NRGBA{R: 0x00, G: 0x00, B: 0xFF, A: 0xFF}
-	white = color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
-	black = color.NRGBA{A: 0xFF}
+	red       = color.NRGBA{R: 0xFF, G: 0x00, B: 0x00, A: 0xFF}
+	green     = color.NRGBA{R: 0x00, G: 0xFF, B: 0x00, A: 0xFF}
+	blue      = color.NRGBA{R: 0x00, G: 0x00, B: 0xFF, A: 0xFF}
+	yellow    = color.NRGBA{R: 0xFF, G: 0xFF, B: 0x00, A: 0xFF}
+	lightGray = color.NRGBA{R: 0xEE, G: 0xEE, B: 0xEE, A: 0xFF}
+	steelBlue = color.NRGBA{R: 0x33, G: 0x66, B: 0xCC, A: 0xFF}
+	white     = color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
+	black     = color.NRGBA{A: 0xFF}
 )
 
 func ptr(s string) *string { return &s }
+
+// hexRGB 共享色值 → 十六进制串(#rrggbb):画布背景/字色等 wire 面参数吃
+// 十六进制串,接线时由 NRGBA 变量落串——测试色值的单一事实源仍是上面的
+// NRGBA 变量,取样断言与画布接线同源不漂移
+func hexRGB(c color.NRGBA) string {
+	return fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.B)
+}
 
 // renderPdfCanvas 经标准管线渲染整画布(NewRenderer 默认接线形态,产物断言为
 // PDF 字节);rs 为 nil 时用临时缓存根的**默认接线**物化器(QR 缝在位,
@@ -57,7 +67,9 @@ func renderPdfCanvas(t *testing.T, rs *resolver.ResourceResolver, c *canvas.Canv
 }
 
 // renderAsPDF / renderAsPDFCtx 指定物化器跑完整管线,返回产物与错误
-// (失败/取消注入面用:错误由调用方 errors.Is 断言,产物断言无逃逸)
+// (失败/取消注入面用:错误由调用方 errors.Is 断言,产物断言无逃逸);
+// rs 为 nil 时与 renderPdfCanvas 同一口径 = 临时缓存根的默认接线物化器
+// (QR 缝在位)——nil 不另设「裸 resolver」语义,消踩坑面
 func renderAsPDF(t *testing.T, rs *resolver.ResourceResolver, c *canvas.Canvas) ([]byte, error) {
 	t.Helper()
 	return renderAsPDFCtx(t, context.Background(), rs, c)
@@ -66,7 +78,7 @@ func renderAsPDF(t *testing.T, rs *resolver.ResourceResolver, c *canvas.Canvas) 
 func renderAsPDFCtx(t *testing.T, ctx context.Context, rs *resolver.ResourceResolver, c *canvas.Canvas) ([]byte, error) {
 	t.Helper()
 	if rs == nil {
-		rs = resolver.New(resolver.WithCacheRoot(t.TempDir()))
+		rs = NewDefaultResolver(resolver.WithCacheRoot(t.TempDir()))
 	}
 	product, err := renderer.RenderAs[[]byte](ctx, NewRenderer(rs), c)
 	return product, err

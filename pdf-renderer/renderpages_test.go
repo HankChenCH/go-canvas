@@ -34,21 +34,17 @@ import (
 
 // markerPage 标记页画布:指定尺寸 + 纯色背景 + 左上角默认字体标记文本
 // (文本走内置 Helvetica,ASCII-only,不依赖 CJK 字体腿;墨迹在角落,
-// 不干扰中心点背景采样)
-func markerPage(width, height int, bg colorHex, marker string) *canvas.Canvas {
+// 不干扰中心点背景采样);bg 用共享 NRGBA 色值(helpers_test 变量),
+// 接线时经 hexRGB 落成背景十六进制串——与取样断言同一事实源
+func markerPage(width, height int, bg color.NRGBA, marker string) *canvas.Canvas {
 	c := canvas.New(width, height, layer.NewTextLayer(
 		layer.WithSize(width, height), layer.WithPosition(0, 0),
 		layer.WithText(marker), layer.WithFont("", 12, "#111111"),
 		layer.WithHorizontalAlign(layer.AlignLeft), layer.WithVerticalAlign(layer.AlignTop),
 	))
-	c.SetBackground(canvas.NewCanvasBackground(ptr(bg.String()), nil))
+	c.SetBackground(canvas.NewCanvasBackground(ptr(hexRGB(bg)), nil))
 	return c
 }
-
-// colorHex 测试用纯色(十六进制串形态,与画布背景色同一取值口径)
-type colorHex string
-
-func (c colorHex) String() string { return string(c) }
 
 // renderPdfPages 多页便捷入口渲染(本 module Renderer 直出 PDF 字节);
 // rs 为 nil 时用临时缓存根的默认接线物化器(与 renderPdfCanvas 同口径)
@@ -140,25 +136,15 @@ func pdfInfoOf(t *testing.T, pdf []byte) string {
 	return runPoppler(t, "pdfinfo", writePdf(t, t.TempDir(), "probe.pdf", pdf))
 }
 
-// nrgba 测试色值 → NRGBA(经 parseColor 取值,与渲染面同一解析口径;
-// assertPixel 断言形参是 color.NRGBA)
-func nrgba(c colorHex) color.NRGBA {
-	parsed, err := parseColor(c.String())
-	if err != nil {
-		panic(fmt.Sprintf("测试色值非法 %s: %v", c, err))
-	}
-	return color.NRGBA{R: parsed.R, G: parsed.G, B: parsed.B, A: parsed.A}
-}
-
 // ---- 多页契约:页数 / 逐页尺寸 / 页序 ----
 
 func TestRenderPagesMultiPageCountSizesAndOrder(t *testing.T) {
 	// 三页三尺寸三背景色:页数 = 页序列长度;各页 MediaBox = 各页 px×0.75;
 	// 页序 = Canvases 序(背景色按页采样 + 标记文本按页提取双重锚定)
 	pages := []*canvas.Canvas{
-		markerPage(320, 240, "#ff0000", "PAGE-ONE"),
-		markerPage(200, 100, "#00ff00", "PAGE-TWO"),
-		markerPage(100, 80, "#0000ff", "PAGE-THREE"),
+		markerPage(320, 240, red, "PAGE-ONE"),
+		markerPage(200, 100, green, "PAGE-TWO"),
+		markerPage(100, 80, blue, "PAGE-THREE"),
 	}
 	pdf := renderPdfPages(t, nil, pages)
 
@@ -170,15 +156,15 @@ func TestRenderPagesMultiPageCountSizesAndOrder(t *testing.T) {
 	// 页序:逐页栅格化采中心点背景色(实心区内部点,零抗锯齿干扰)
 	centers := []struct {
 		w, h int
-		want colorHex
+		want color.NRGBA
 	}{
-		{320, 240, "#ff0000"},
-		{200, 100, "#00ff00"},
-		{100, 80, "#0000ff"},
+		{320, 240, red},
+		{200, 100, green},
+		{100, 80, blue},
 	}
 	for i, cc := range centers {
 		img := rasterizePage(t, pdf, i+1, cc.w, cc.h)
-		assertPixel(t, img, cc.w/2, cc.h/2, nrgba(cc.want))
+		assertPixel(t, img, cc.w/2, cc.h/2, cc.want)
 	}
 
 	// 页序:标记文本按页提取(默认字体 ASCII,ToUnicode 无关也可提取)
@@ -197,7 +183,7 @@ func TestRenderPagesMultiPageCountSizesAndOrder(t *testing.T) {
 // ---- 退化:单 canvas 多页入口 vs 工票 02 单页渲染,结构一致 ----
 
 func TestRenderPagesSingleCanvasDegeneratesLikeSingleRender(t *testing.T) {
-	c := markerPage(240, 160, "#3366cc", "DEGENERATE-PAGE")
+	c := markerPage(240, 160, steelBlue, "DEGENERATE-PAGE")
 
 	multi := renderPdfPages(t, resolver.New(resolver.WithCacheRoot(t.TempDir())), []*canvas.Canvas{c})
 	single := renderPdfCanvas(t, nil, c) // 工票 02 单页入口(renderer.RenderAs[[]byte])
@@ -214,7 +200,7 @@ func TestRenderPagesSingleCanvasDegeneratesLikeSingleRender(t *testing.T) {
 	if text := pageText(t, multi, 1); !strings.Contains(text, "DEGENERATE-PAGE") {
 		t.Errorf("多页入口单页应含标记文本, got %q", text)
 	}
-	assertPixel(t, rasterizePage(t, multi, 1, 240, 160), 120, 80, nrgba("#3366cc"))
+	assertPixel(t, rasterizePage(t, multi, 1, 240, 160), 120, 80, steelBlue)
 }
 
 // ---- End 后复用:同一 Renderer 实例必须得到干净新文档 ----
@@ -227,8 +213,8 @@ func TestRendererReuseAfterEndStartsFreshDocument(t *testing.T) {
 
 	// 第一次:两页两尺寸
 	pdf1, err := RenderPages(ctx, r, []*canvas.Canvas{
-		markerPage(100, 80, "#ff0000", "DOC1-A"),
-		markerPage(120, 90, "#00ff00", "DOC1-B"),
+		markerPage(100, 80, red, "DOC1-A"),
+		markerPage(120, 90, green, "DOC1-B"),
 	})
 	if err != nil {
 		t.Fatalf("第一次 RenderPages: %v", err)
@@ -238,7 +224,7 @@ func TestRendererReuseAfterEndStartsFreshDocument(t *testing.T) {
 	}
 
 	// 第二次(同一实例,多页入口):一页不同尺寸——复位失效时会是 3 页旧+新混排
-	pdf2, err := RenderPages(ctx, r, []*canvas.Canvas{markerPage(200, 150, "#0000ff", "DOC2-A")})
+	pdf2, err := RenderPages(ctx, r, []*canvas.Canvas{markerPage(200, 150, blue, "DOC2-A")})
 	if err != nil {
 		t.Fatalf("第二次 RenderPages: %v", err)
 	}
@@ -246,10 +232,10 @@ func TestRendererReuseAfterEndStartsFreshDocument(t *testing.T) {
 		t.Errorf("End 后复用必须得到干净新文档: Pages = %q, want 1", got)
 	}
 	assertPageSizes(t, pdf2, [][2]int{{200, 150}})
-	assertPixel(t, rasterizePage(t, pdf2, 1, 200, 150), 100, 75, nrgba("#0000ff"))
+	assertPixel(t, rasterizePage(t, pdf2, 1, 200, 150), 100, 75, blue)
 
 	// 第三次(同一实例,单页入口):单页渲染同样受益于复位语义
-	pdf3, err := renderer.RenderAs[[]byte](ctx, r, markerPage(80, 60, "#ffff00", "DOC3-A"))
+	pdf3, err := renderer.RenderAs[[]byte](ctx, r, markerPage(80, 60, yellow, "DOC3-A"))
 	if err != nil {
 		t.Fatalf("第三次 RenderAs: %v", err)
 	}
@@ -303,7 +289,7 @@ func TestRenderPagesDownloadFailureOnLaterPageNoProduct(t *testing.T) {
 	broken := canvas.New(60, 40, brokenLayer)
 
 	product, err := RenderPagesAs[[]byte](context.Background(), NewRenderer(rs),
-		[]*canvas.Canvas{markerPage(60, 40, "#eeeeee", "OK-PAGE"), broken})
+		[]*canvas.Canvas{markerPage(60, 40, lightGray, "OK-PAGE"), broken})
 	if err == nil {
 		t.Fatal("第 2 页下载失败必须报错")
 	}
@@ -323,7 +309,7 @@ func TestRenderPagesCancelArmedAtInterPageCheckpoint(t *testing.T) {
 	// 恰为页间一处(下一页 Begin 前)——页间检查点语义在 PDF 后端的落点验证
 	pages := []*canvas.Canvas{
 		canvas.New(60, 40),
-		markerPage(60, 40, "#eeeeee", "NEVER-REACHED"),
+		markerPage(60, 40, lightGray, "NEVER-REACHED"),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -344,7 +330,7 @@ func TestRenderPagesDeadlineArmedAtInterPageCheckpoint(t *testing.T) {
 	// 同上检查点,deadline 已到期 → ErrRenderDeadlineExceeded
 	pages := []*canvas.Canvas{
 		canvas.New(60, 40),
-		markerPage(60, 40, "#eeeeee", "NEVER-REACHED"),
+		markerPage(60, 40, lightGray, "NEVER-REACHED"),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 0)

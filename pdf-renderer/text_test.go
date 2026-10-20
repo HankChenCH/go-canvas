@@ -6,6 +6,7 @@ package pdfrenderer
 // 手法对齐 image-renderer text_test.go 的 inkBox 断言
 
 import (
+	"fmt"
 	"image"
 	"strings"
 	"testing"
@@ -17,7 +18,13 @@ import (
 // inkBox 非白墨迹包围盒(pdftoppm 无透明:透明页面栅格化为白底,
 // 墨迹 = 任一通道暗于阈值的像素);无墨迹时 ok=false
 func inkBox(img *image.NRGBA) (minX, minY, maxX, maxY int, ok bool) {
-	b := img.Bounds()
+	return inkBoxIn(img, img.Bounds())
+}
+
+// inkBoxIn 区域限定的非白墨迹包围盒(clip ∩ 栅格内扫描);墨迹判定同
+// inkBox——任一通道暗于阈值的像素,无墨迹时 ok=false
+func inkBoxIn(img *image.NRGBA, clip image.Rectangle) (minX, minY, maxX, maxY int, ok bool) {
+	b := img.Bounds().Intersect(clip)
 	minX, minY = b.Max.X, b.Max.Y
 	maxX, maxY = b.Min.X-1, b.Min.Y-1
 	for y := b.Min.Y; y < b.Max.Y; y++ {
@@ -208,6 +215,135 @@ func TestDrawTextAngleRotatesAboutAnchor(t *testing.T) {
 	}
 	if lx0 >= 40 {
 		t.Errorf("顺时针(-90)旋转后墨迹左缘 x=%d, 应向左越过锚点 x=40", lx0)
+	}
+}
+
+func TestDrawTextAnchorMatrixCrossProduct(t *testing.T) {
+	// 工票 02 验收面的真交叉积:hAlign×vAlign×角度(0/±90)全组合 27 格,
+	// 单页网格一次渲染一次栅格化,逐格点位断言(不拆轴、不留弱化角)——
+	// 0° 行逐格锁定对齐锚点语义(实测宽度水平对齐 + metrics 垂直基线),
+	// ±90° 行逐格断言「墨迹相对盒 = 同列 0° 相对盒绕锚点的旋转像」(对齐
+	// 偏移随落笔点一起旋转,恒距变换),全程不依赖具体字体度量数值
+	const (
+		cell = 80 // 单格边长:墨迹最大伸展(WWW@12px 宽 ≈34px + 抗锯齿)< 半格
+		tol  = 2  // 栅格化抗锯齿边缘容差(px)
+	)
+	hAligns := []string{layer.AlignLeft, layer.AlignCenter, layer.AlignRight}
+	vAligns := []string{layer.AlignTop, layer.AlignCenter, layer.AlignBottom}
+	angles := []int{0, 90, -90}
+	cols := len(hAligns) * len(vAligns)
+	width, height := cols*cell, len(angles)*cell
+
+	img := drawTextOn(t, width, height, func(r *Renderer) error {
+		for row, angle := range angles {
+			for col := 0; col < cols; col++ {
+				h, v := hAligns[col/len(vAligns)], vAligns[col%len(vAligns)]
+				// 锚点 = 格中心:同一字面同一字号,全组合铺满网格
+				if err := r.DrawText("WWW", col*cell+cell/2, row*cell+cell/2,
+					"", 12, "#000", h, v, angle); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+
+	// relBox 锚点相对墨迹盒(格内缩 2px 扫描,隔离相邻格的抗锯齿越界)
+	relBox := func(col, row int) (x0, y0, x1, y1 int, ok bool) {
+		clip := image.Rect(col*cell+2, row*cell+2, (col+1)*cell-2, (row+1)*cell-2)
+		minX, minY, maxX, maxY, hasInk := inkBoxIn(img, clip)
+		if !hasInk {
+			return 0, 0, 0, 0, false
+		}
+		return minX - col*cell - cell/2, minY - row*cell - cell/2,
+			maxX - col*cell - cell/2, maxY - row*cell - cell/2, true
+	}
+	within := func(got, want int) bool { return got >= want-tol && got <= want+tol }
+	alignPair := func(col int) (string, string) {
+		return hAligns[col/len(vAligns)], vAligns[col%len(vAligns)]
+	}
+
+	// 0° 行:hAlign×vAlign 锚点语义 9 格逐格锁定
+	for col := 0; col < cols; col++ {
+		h, v := alignPair(col)
+		label := fmt.Sprintf("0°(%s,%s)", h, v)
+		x0, y0, x1, y1, ok := relBox(col, 0)
+		if !ok {
+			t.Fatalf("%s 无墨迹", label)
+		}
+		switch h {
+		case layer.AlignLeft:
+			if !within(x0, 0) {
+				t.Errorf("%s 左对齐应从锚点起笔: 首列相对 x=%d, want |x|≤%d", label, x0, tol)
+			}
+		case layer.AlignCenter:
+			if !within(x0+x1, 0) {
+				t.Errorf("%s 居中应关于锚点对称: 左距 %d vs 右距 %d", label, -x0, x1)
+			}
+		case layer.AlignRight:
+			if !within(x1, 0) {
+				t.Errorf("%s 右对齐应收于锚点: 末列相对 x=%d, want |x|≤%d", label, x1, tol)
+			}
+		}
+		switch v {
+		case layer.AlignTop:
+			if y0 < -1 {
+				t.Errorf("%s 顶对齐墨迹不得高于锚点上方 1px: 首行相对 y=%d", label, y0)
+			}
+		case layer.AlignCenter:
+			if y0 >= 0 || y1 <= 0 {
+				t.Errorf("%s 居中墨迹 [%d,%d] 应跨越锚点两侧", label, y0, y1)
+			}
+		case layer.AlignBottom:
+			if y1 > 1 {
+				t.Errorf("%s 底对齐墨迹应收于锚点上方: 末行相对 y=%d", label, y1)
+			}
+		}
+	}
+
+	// ±90° 行:墨迹相对盒 = 同列 0° 相对盒的旋转像
+	// (+90 视觉逆时针:(dx,dy)→(dy,−dx);−90 镜像:(dx,dy)→(−dy,dx);
+	// 与既有 TestDrawTextAngleRotatesAboutAnchor 的方向标定同源)
+	rotBox := func(angle, x0, y0, x1, y1 int) (int, int, int, int) {
+		switch angle {
+		case 90:
+			return y0, -x1, y1, -x0
+		case -90:
+			return -y1, x0, -y0, x1
+		}
+		return x0, y0, x1, y1
+	}
+	base0 := make([][4]int, cols)
+	for col := 0; col < cols; col++ {
+		x0, y0, x1, y1, ok := relBox(col, 0)
+		if !ok {
+			t.Fatalf("0° 第 %d 列无墨迹,±90° 行失去旋转基准", col)
+		}
+		base0[col] = [4]int{x0, y0, x1, y1}
+	}
+	for col := 0; col < cols; col++ {
+		h, v := alignPair(col)
+		bx0, by0, bx1, by1 := base0[col][0], base0[col][1], base0[col][2], base0[col][3]
+		for row, angle := range angles[1:] {
+			label := fmt.Sprintf("%d°(%s,%s)", angle, h, v)
+			gx0, gy0, gx1, gy1, ok := relBox(col, row+1)
+			if !ok {
+				t.Fatalf("%s 无墨迹", label)
+			}
+			wx0, wy0, wx1, wy1 := rotBox(angle, bx0, by0, bx1, by1)
+			for _, e := range []struct {
+				name      string
+				got, want int
+			}{
+				{"x0", gx0, wx0}, {"y0", gy0, wy0},
+				{"x1", gx1, wx1}, {"y1", gy1, wy1},
+			} {
+				if !within(e.got, e.want) {
+					t.Errorf("%s 墨迹相对盒 %s = %d, want %d(±%d,应为同列 0° 盒绕锚点的旋转像)",
+						label, e.name, e.got, e.want, tol)
+				}
+			}
+		}
 	}
 }
 
