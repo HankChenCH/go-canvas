@@ -15,8 +15,9 @@ import (
 // width/height ≤ 0 防护不画;stroke.Width ≤ 0 不描(wire 解码可注入,与
 // borderBands 同纪律)。pxToPt 口径:外接矩形 → 圆心/半轴、线宽换算后统一
 // ×0.75,fpdf Ellipse 入参恒用户空间(内部自换算,与 ClipRect/Transform 家族
-// 同一双空间纪律)。半透明色经 ExtGState 挂 alpha(paintRect 同款),画完恢复
-// 不透明——后续元素不吃残留
+// 同一双空间纪律)。颜色先解析后挂载——错误路径不残留任何文档状态。
+// 已知限制:fpdf 的 ExtGState alpha 对单次 "FD" 的填充与描边一体生效,两色
+// alpha 不同时后挂载者同时作用于两者(当前分派层两调各只带一色,不触发)
 func (r *Renderer) DrawEllipse(x, y, width, height int, fillColor *string, stroke *layer.BorderSide) error {
 	doc, err := r.docf()
 	if err != nil {
@@ -26,23 +27,32 @@ func (r *Renderer) DrawEllipse(x, y, width, height int, fillColor *string, strok
 		return nil
 	}
 
-	style := ""
+	// 颜色先全量解析(错误在改任何文档状态前返回),再按风格挂载
+	var fill, draw *rgba
 	if fillColor != nil && *fillColor != "" {
 		c, err := parseColor(*fillColor)
 		if err != nil {
 			return err
 		}
-		doc.SetAlpha(float64(c.A)/255, "Normal")
-		doc.SetFillColor(int(c.R), int(c.G), int(c.B))
-		style = "F"
+		fill = &c
 	}
 	if stroke != nil && stroke.Width > 0 {
 		c, err := parseColor(stroke.Color)
 		if err != nil {
 			return err
 		}
-		doc.SetAlpha(float64(c.A)/255, "Normal")
-		doc.SetDrawColor(int(c.R), int(c.G), int(c.B))
+		draw = &c
+	}
+
+	style := ""
+	if fill != nil {
+		doc.SetAlpha(float64(fill.A)/255, "Normal")
+		doc.SetFillColor(int(fill.R), int(fill.G), int(fill.B))
+		style = "F"
+	}
+	if draw != nil {
+		doc.SetAlpha(float64(draw.A)/255, "Normal")
+		doc.SetDrawColor(int(draw.R), int(draw.G), int(draw.B))
 		doc.SetLineWidth(float64(stroke.Width) * pxToPt)
 		style += "D"
 	}

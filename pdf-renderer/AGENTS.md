@@ -2,16 +2,17 @@
 
 ## Purpose
 
-go-canvas 的 PDF 渲染后端(嵌套 module `github.com/HankChenCH/go-canvas/pdf-renderer`,包名 `pdfrenderer`):以 go-pdf/fpdf 新建单文档为渲染面,实现核心 `renderer.Backend` 五原语,End 产物为 PDF 文档字节 `[]byte`(经 `renderer.RenderAs[[]byte]` 消费)。PHP 权威端的 PDF 姊妹件;位图后端 `image-renderer` 的 PDF 对位件——语义对齐、手段各异(像素搬运 vs 矢量直嵌)。中文是代码注释工作语言;commit 用 conventional-commit 前缀 + 中文 subject。
+go-canvas 的 PDF 渲染后端(嵌套 module `github.com/HankChenCH/go-canvas/pdf-renderer`,包名 `pdfrenderer`):以 go-pdf/fpdf 新建单文档为渲染面,实现核心 `renderer.Backend` 五原语 + 可选形状能力口 `renderer.ShapeCapableBackend`(ADR 0026,ClipEllipse 掩码 blit + 原生 Ellipse 椭圆绘制,未实现即对 clip 声明降级矩形——本后端已实现),End 产物为 PDF 文档字节 `[]byte`(经 `renderer.RenderAs[[]byte]` 消费)。PHP 权威端的 PDF 姊妹件;位图后端 `image-renderer` 的 PDF 对位件——语义对齐、手段各异(像素搬运 vs 矢量直嵌)。中文是代码注释工作语言;commit 用 conventional-commit 前缀 + 中文 subject。
 
 ## Layout
 
-- `backend.go` — Renderer 会话(Begin/End/DrawRect)+ 几何/颜色小件:`pxToPt`(96dpi,pt = px × 0.75,页 MediaBox/坐标/字号一律 ×0.75)、`borderBands`(盒内嵌色带,序 top/bottom/left/right,与 image-renderer 同一公式)。Begin 是**文档续页语义**:首次建档、文档已在则 AddPageFormat 续页(单文档连续性,多页入口工票 03 逐页 Begin);End 防御性复查文档错误位,宁可无产物不可出半成品,**且一次性终结会话**(doc 与字体注册表复位)——End 后同一实例复用(单页/多页入口皆然)必须得到干净新文档,不得续进旧文档(工票 03 验收锁定);渲染失败路径 End 不达,失败后实例不复用(渲染面已弃,重试请各自 New)。
+- `backend.go` — Renderer 会话(Begin/End/DrawRect)+ 几何/颜色小件:`pxToPt`(96dpi,pt = px × 0.75,页 MediaBox/坐标/字号一律 ×0.75)、`borderBands`(盒内嵌色带,序 top/bottom/left/right,与 image-renderer 同一公式);编译期对 `renderer.Backend` 与 `renderer.ShapeCapableBackend` 双契约断言(签名漂移漏检)。Begin 是**文档续页语义**:首次建档、文档已在则 AddPageFormat 续页(单文档连续性,多页入口工票 03 逐页 Begin);End 防御性复查文档错误位,宁可无产物不可出半成品,**且一次性终结会话**(doc 与字体注册表复位)——End 后同一实例复用(单页/多页入口皆然)必须得到干净新文档,不得续进旧文档(工票 03 验收锁定);渲染失败路径 End 不达,失败后实例不复用(渲染面已弃,重试请各自 New)。
 - `renderpages.go` — 多页入口(工票 03):`RenderPages`(便捷具体入口,`*Renderer` + 页序列直出 `[]byte`)与 `RenderPagesAs[T]`(泛型断言,镜像核心 renderas.go 消费面;断言发生在渲染成功后,用法错误不设 code)。编排归核心 `renderer.RenderPages`(工票 01),本文件只做后端接线与产物断言;`assertProduct` 为核心未导出辅助的本 module 自组件。
 - `color.go` — `rgba` + `parseColor`(hex 四形态,非法输入报错中止;image-renderer color.go 同式复制,两后端防线对称)。
 - `decode.go` — 内在尺寸探测(DecodeConfig,三格式注册)+ `sniffType` 魔数嗅探(扩展名不可信,直嵌 ImageType 用嗅探结果)。
 - `exif.go` — EXIF orientation 最小解析(APP1/IFD0 Orientation 标签;image-renderer exif.go 同式复制)。转正消化手段不同:位图后端搬像素,PDF 后端经放置矩阵(`image.go orientAffine`)归正,直嵌字节零重编码。
-- `image.go` — DrawImage:直嵌(RegisterImageOptionsReader,fpdf 按名去重)+ ClipRect 裁 dst + 放置矩阵映射 srcRect→dstRect。`affine` 2×3 仿射(y 向下)+ `orientAffine` 八向归正矩阵 + `placeAffine` 像素空间→PDF 原生空间发射公式(F∘P∘F 夹逼,docblock 有推导与恒等自检)。
+- `image.go` — DrawImage/DrawImageMasked:直嵌(RegisterImageOptionsReader,fpdf 按名去重)+ 裁剪路径(ClipRect 裁 dst;掩码 blit 以 ClipEllipse 内切椭圆替位,`inscribedEllipse` 唯一几何落点,ADR 0026)+ 放置矩阵映射 srcRect→dstRect,blit 主体抽 `embedBlit` 两原语同源(裁剪闭包在 TransformBegin 之前的用户空间施加)。`affine` 2×3 仿射(y 向下)+ `orientAffine` 八向归正矩阵 + `placeAffine` 像素空间→PDF 原生空间发射公式(F∘P∘F 夹逼,docblock 有推导与恒等自检)。
+- `ellipse.go` — DrawEllipse(形状能力口,ADR 0026):fpdf 原生 `Ellipse` 填充("F")/描边("D")/填充加描边("FD")三风格一体,pxToPt 口径换算圆心/半轴/线宽;描边为驱动原生缘上居中带 [r-w/2, r+w/2](与位图内缩带 [r-w, r] 的环位分歧由采样公共带吸收,PHP GD/Imagick 双驱同款纪律);颜色先解析后挂载,错误路径不残留文档状态;alpha 经 ExtGState 挂载画完恢复(paintRect 同款)。
 - `text.go` — DrawText:TTF 子集内嵌(AddUTF8FontFromBytes)+ 对齐/基线/角度 + Helvetica 兜底。度量与字体坑见下节。
 - `qr.go` — QRMaterializer + NewDefaultResolver + NewRenderer(ADR-0002 二维码缝默认接线;image-renderer qr.go 同式复制,物化字节面完全一致)。
 - `cmd/visualcheck/` — 目验样张:综合样张出 .pdf + pdftoppm -r 96 预览 png(poppler 缺席时跳过预览只出 .pdf)。CJK 字体候选与测试探针同口径,`GO_CANVAS_VISUAL_FONT` 可覆写,全缺降级 Helvetica 只排 ASCII。
