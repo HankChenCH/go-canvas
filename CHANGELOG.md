@@ -2,6 +2,15 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## 1.7.0 - 2026-10-20
+
+**Breaking**（ADR 0026，接口扩展，/v2 显式延后）:渲染后端契约新增可选形状能力口 `renderer.ShapeCapableBackend`（嵌入 `Backend` 的加法接口，两新原语 `DrawEllipse(x, y, w, h, fillColor, stroke)` 与 `DrawImageMasked(src, srcRect, dstRect, maskRect)`）——既有 `Backend` 实现零破坏（接口探测为可选能力口，未实现者对 clip 声明静默降级矩形渲染），希望承接圆形档的后端按新接口补两原语。Go 生态全第一方锁步升级，本版以 minor 携 breaking note（ADR 0024 先例），外部后端作者出现时再议 /v2。
+
+- 图片层裁剪形状 clip 跟随（与 `php-canvas-next` 对等，ADR 0026 裁剪形状圆形档）：`layer.ImageLayer` 增 `ClipRect`/`ClipCircle` 常量与 `SetClip`/`Clip`（空串 = rect 缺省，显式 rect 归一空串，未知值宽容透传，与 src/fit 正交）；wire 条件写键（缺省整键不落、殿后 spec 末位 fit 之后，键序 shape/align/position/fit/clip，缺省态字节面与无字段版本一致），存量 wire 断言按设计保绿（layout-snapshot 存量零 diff 无需重导）；hydrate/expand 对 spec 仅透传（`image-fit-spec-passthrough` 锚点普适语义覆盖，零改动）
+- 内切圆与圆周描边纯函数（与 PHP 同公式、整除向零截断同门）：`ImageLayer.InscribedCircleRect`（边长 = min(内容区宽高)、盒内对齐定位——center 取整盒中点、left/top 贴 padding 原点侧、非方盒恒正方几何留透明边不变形为椭圆）、`ImageLayer.CircleStroke`（宽取四边已声明宽最小值、色按 top→right→bottom→left 取首个非空边色、四边全未声明不描边；未声明或 width≤0 的边不计，与 borderBands 同纪律）
+- 渲染臂圆形档三步分派：`paintImage` 双门（clip 白名单 + `ShapeCapableBackend` 类型断言）命中走 `paintImageCircle`——① 椭圆背景填充（矩形盒 DrawRect 不画）→ ② 内容按 fit 绘出后遮罩 blit（掩码矩形 = 内切圆矩形）→ ③ 边框沿圆周描环；未知 clip 值与后端缺能力口降级矩形路径（fit 未知值纪律同门），内切圆边长 ≤0 零几何零绘制，内在尺寸不可用退化 fill 形态再裁圆（ADR 0024 纪律）；fit 分派几何抽 `paintFitBlits` 两形态共用同一份防数学漂移（先绘后裁，fit 与 clip 正交）
+- 嵌套 module `image-renderer`（**v1.2.0**，核心与位图后端锁步 minor）两原语实现（stdlib draw 掩码面，二值覆盖无抗锯齿对齐 PHP GD 驱动形态）：`DrawEllipse`（draw.DrawMask 椭圆填充 + 外缘内缩环带描边——内缩带与 DrawRect 盒内嵌边带同门）与 `DrawImageMasked`（blit 前段抽 `blitSource` 与 DrawImage 同源 + 椭圆掩码逐像素置透明）；像素点位平移 PHP 矩阵（四角透明露下层、圆心为图、环带为描边色、padding 留白、非方盒正圆透明边、circle × fit 四档组合、未知 clip 值降级矩形），无黄金文件
+
 ## 1.6.0 - 2026-10-20
 
 - 核心 module renderer 包多页 walk 模板 `RenderPages`（go-pdf-renderer effort 工票 01，canvas-compiler 工票 07「AbstractRenderer 多页钩子」Go 同构）：`RenderPages(ctx, backend, pages []*canvas.Canvas) (any, error)`——逐页 Begin(页宽,页高) → 背景逐页显式铺装（ADR 0022，先色后图）→ 逐层 paint，全部页完成后统一 End 一次（n 页 = n 次 Begin + 1 次 End）；ctx 检查点页间一处新增（下一页 Begin 前），既有根层每图层前/表行每行前检查点同位不动；任一页任一原语/物化失败即 error、End 不达、整个文档无产物逃逸；空页序列守卫按调用侧用法错误处理（错误 code 豁免条款同步扩写）。既有 `Render`/`RenderLayer` 签名与行为零变化（`renderSurface` 页内段抽取 `paintPage`、单页两段式，存量测试保绿），wire 字节面不动（layout-snapshot 无需重导）
