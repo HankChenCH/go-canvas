@@ -5,7 +5,11 @@ package pdfrenderer
 // resolver 统一负责,这里只做"内容+宽度 → PNG 字节"。
 // 与 image-renderer qr.go 同一公式的小件复制:QRMaterializer 是后端 module 的
 // 接线知识(ADR-0002),两后端各自持有同一默认实现;矩阵差异只在渲染原语的
-// 消费端(位图 blit vs PDF 直嵌),物化字节面完全一致
+// 消费端(位图 blit vs PDF 直嵌),物化字节面完全一致(适用域 = 本仓 Go 两后端
+// module 各自的 QRMaterializer 对同一 (内容, 宽度) 输入的 PNG 产物逐字节——同库
+// 同版本 pin、固定选项与公式逐项同源,字节一致是按构造成立;反例域 = 与 PHP
+// endroid 产物的字节面——块宽量化与 PNG 编码器实现不同源,跨端一致性只锚定在
+// 选项级逐项对齐 + 渲染消费端 cover 铺放,不承诺字节 parity)
 
 import (
 	"bytes"

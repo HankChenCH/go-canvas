@@ -121,7 +121,9 @@ func TestDrawImageSrcRectOutsideSilent(t *testing.T) {
 }
 
 func TestDrawImageGarbageAborts(t *testing.T) {
-	// 垃圾字节报错中止(嗅探防线,结局与位图后端 parity)
+	// 垃圾字节报错中止(嗅探防线;与位图后端的 parity 适用域 =「不可解码字节
+	// 必须报错中止、不得静默出图」这一失败结局,两后端防线对称;反例域 =
+	// 错误文案与错误类型——两后端各出各的普通包装 error,不在契约内)
 	r := New()
 	if err := r.Begin(10, 10); err != nil {
 		t.Fatalf("Begin: %v", err)
