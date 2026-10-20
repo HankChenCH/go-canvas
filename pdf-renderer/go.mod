@@ -3,7 +3,7 @@ module github.com/HankChenCH/go-canvas/pdf-renderer
 go 1.25.0
 
 require (
-	github.com/HankChenCH/go-canvas v1.6.0
+	github.com/HankChenCH/go-canvas v1.7.0
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/yeqown/go-qrcode/v2 v2.3.0
 	github.com/yeqown/go-qrcode/writer/standard v1.4.0

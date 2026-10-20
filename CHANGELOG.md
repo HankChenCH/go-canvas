@@ -10,6 +10,8 @@
 - 内切圆与圆周描边纯函数（与 PHP 同公式、整除向零截断同门）：`ImageLayer.InscribedCircleRect`（边长 = min(内容区宽高)、盒内对齐定位——center 取整盒中点、left/top 贴 padding 原点侧、非方盒恒正方几何留透明边不变形为椭圆）、`ImageLayer.CircleStroke`（宽取四边已声明宽最小值、色按 top→right→bottom→left 取首个非空边色、四边全未声明不描边；未声明或 width≤0 的边不计，与 borderBands 同纪律）
 - 渲染臂圆形档三步分派：`paintImage` 双门（clip 白名单 + `ShapeCapableBackend` 类型断言）命中走 `paintImageCircle`——① 椭圆背景填充（矩形盒 DrawRect 不画）→ ② 内容按 fit 绘出后遮罩 blit（掩码矩形 = 内切圆矩形）→ ③ 边框沿圆周描环；未知 clip 值与后端缺能力口降级矩形路径（fit 未知值纪律同门），内切圆边长 ≤0 零几何零绘制，内在尺寸不可用退化 fill 形态再裁圆（ADR 0024 纪律）；fit 分派几何抽 `paintFitBlits` 两形态共用同一份防数学漂移（先绘后裁，fit 与 clip 正交）
 - 嵌套 module `image-renderer`（**v1.2.0**，核心与位图后端锁步 minor）两原语实现（stdlib draw 掩码面，二值覆盖无抗锯齿对齐 PHP GD 驱动形态）：`DrawEllipse`（draw.DrawMask 椭圆填充 + 外缘内缩环带描边——内缩带与 DrawRect 盒内嵌边带同门）与 `DrawImageMasked`（blit 前段抽 `blitSource` 与 DrawImage 同源 + 椭圆掩码逐像素置透明）；像素点位平移 PHP 矩阵（四角透明露下层、圆心为图、环带为描边色、padding 留白、非方盒正圆透明边、circle × fit 四档组合、未知 clip 值降级矩形），无黄金文件
+- 嵌套 module `pdf-renderer`（**v1.1.0**，锁步 minor）两原语矢量承接（ADR 0026）：`DrawImageMasked` 以 `ClipEllipse` 替位既有 `ClipRect`（掩码 = 内切于掩码矩形的椭圆，`inscribedEllipse` 唯一几何落点），直嵌零重编码与放置矩阵机制全复用（blit 主体抽 `embedBlit` 与 DrawImage 同源，裁剪闭包在 TransformBegin 之前的用户空间施加）；`DrawEllipse` 走 fpdf 原生 `Ellipse` 填充/描边/填充加描边三风格一体（描边为驱动原生缘上居中带，与位图内缩带的环位分歧由采样公共带吸收，PHP GD/Imagick 双驱同款纪律），pxToPt 口径与坐标双空间纪律不破。poppler 点位采样平移位图腿同矩阵（圆缘采样点自缘内缩 ≥3px 留矢量过渡带余量，描边采样半径 r-w/4 取居中带/内缩带公共区），无黄金文件；位图/矢量等价域 = 单页放置面（ADR 0024 延伸至椭圆面）
+- 工程面：`go.work` 补版本化 `replace`（`v1.7.0 => ./`）——require 版本的 go.mod 必须可解析而 proxy 只认已推送 tag，此行把锁步发版前的核心 require 钉到本地工作副本，`use` 即时解析的既有意图由此对未推送版本成立；发版推送后对 CI（GOWORK=off）零影响，后续核心锁步同步前移版本号
 
 ## 1.6.0 - 2026-10-20
 
