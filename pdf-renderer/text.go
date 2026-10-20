@@ -9,6 +9,7 @@ package pdfrenderer
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"os"
 
@@ -67,10 +68,11 @@ func (r *Renderer) DrawText(
 		ascentPt = float64(helveticaAscentPerEm) / 1000 * sizePt
 		descentPt = float64(helveticaDescentPerEm) / 1000 * sizePt
 	} else {
-		if err := r.addUTF8Font(doc, fontFile); err != nil {
+		family, err := r.addUTF8Font(doc, fontFile)
+		if err != nil {
 			return err
 		}
-		doc.SetFont(fontFile, "", sizePt)
+		doc.SetFont(family, "", sizePt)
 		// GetFontDesc 空族取当前字体:Ascent/Descent per-1000 归一
 		// (UTF8 字体经 hhea/OS2 解析,fpdf 内部完成)
 		desc := doc.GetFontDesc("", "")
@@ -101,8 +103,10 @@ func (r *Renderer) DrawText(
 		baselineY = -descentPt
 	}
 
-	tx := (float64(x)+penX)*pxToPt
-	ty := (float64(y) + baselineY) * pxToPt
+	// 锚点 px→pt;对齐偏移(penX/baselineY)已由实测宽度/metrics 以 pt 计,
+	// 不再乘换算系数——单位混乘会把对齐整体缩水 0.75 倍
+	tx := float64(x)*pxToPt + penX
+	ty := float64(y)*pxToPt + baselineY
 
 	doc.SetAlpha(float64(c.A)/255, "Normal")
 	doc.SetTextColor(int(c.R), int(c.G), int(c.B))
@@ -124,32 +128,37 @@ func (r *Renderer) DrawText(
 	return nil
 }
 
-// addUTF8Font 注册 TTF 子集内嵌字体(键 = 字体路径,同路径复用;fpdf 按字体键
-// 去重,整文档同一字体只嵌一份子集)。TTC/OTC 集合显式拒收:fpdf 的 UTF8 解析器
+// addUTF8Font 注册 TTF 子集内嵌字体,返回合成字体族名。族名 = "f" + 路径
+// sha256 前 16 位hex——**不得用原始路径**:路径会原样写进 PDF Name 对象
+// (/BaseFont),其中的 "/" 与空格破坏字典解析(poppler 报 "Dictionary key
+// must be a name object" 且字体面整体降级)。同路径复用;fpdf 按字体键去重,
+// 整文档同一字体只嵌一份子集。TTC/OTC 集合显式拒收:fpdf 的 UTF8 解析器
 // 不认 ttcf 魔数且失败路径不设错误位(仅向 stdout 打日志)——静默吞掉会留到
 // 后续 SetFont 才爆"undefined font",故先魔数嗅探、再以字体描述符非零校验注册
 // 确已生效(解析失败的字节缓存不得入册)
-func (r *Renderer) addUTF8Font(doc *fpdf.Fpdf, fontFile string) error {
-	if _, ok := r.fontBytes[fontFile]; ok {
-		return nil // 本会话已注册
+func (r *Renderer) addUTF8Font(doc *fpdf.Fpdf, fontFile string) (string, error) {
+	if family, ok := r.fonts[fontFile]; ok {
+		return family, nil // 本会话已注册
 	}
 	data, err := os.ReadFile(fontFile)
 	if err != nil {
-		return fmt.Errorf("读取字体 %s: %w", fontFile, err)
+		return "", fmt.Errorf("读取字体 %s: %w", fontFile, err)
 	}
 	if bytes.HasPrefix(data, []byte("ttcf")) {
-		return fmt.Errorf("字体 %s 为 TTC/OTC 字体集:PDF 子集内嵌仅支持单体 TTF", fontFile)
+		return "", fmt.Errorf("字体 %s 为 TTC/OTC 字体集:PDF 子集内嵌仅支持单体 TTF", fontFile)
 	}
-	doc.AddUTF8FontFromBytes(fontFile, "", data)
+	sum := sha256.Sum256([]byte(fontFile))
+	family := fmt.Sprintf("f%x", sum[:8])
+	doc.AddUTF8FontFromBytes(family, "", data)
 	if doc.Err() {
-		return fmt.Errorf("注册字体 %s: %w", fontFile, doc.Error())
+		return "", fmt.Errorf("注册字体 %s: %w", fontFile, doc.Error())
 	}
-	if (fpdf.FontDescType{} == doc.GetFontDesc(fontFile, "")) {
-		return fmt.Errorf("注册字体 %s: 字体解析失败(TTF 格式不合法或为 fpdf 不支持的变体)", fontFile)
+	if (fpdf.FontDescType{} == doc.GetFontDesc(family, "")) {
+		return "", fmt.Errorf("注册字体 %s: 字体解析失败(TTF 格式不合法或为 fpdf 不支持的变体)", fontFile)
 	}
-	if r.fontBytes == nil {
-		r.fontBytes = make(map[string][]byte)
+	if r.fonts == nil {
+		r.fonts = make(map[string]string)
 	}
-	r.fontBytes[fontFile] = data
-	return nil
+	r.fonts[fontFile] = family
+	return family, nil
 }

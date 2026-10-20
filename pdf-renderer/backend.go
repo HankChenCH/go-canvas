@@ -33,9 +33,9 @@ type Renderer struct {
 	width  int        // 渲染面宽(px,页面几何换算基准)
 	height int        // 渲染面高(px)
 
-	// fontBytes 字体文件字节缓存(路径 → 字节):多行文本逐行 DrawText,
-	// 同一路径只读盘一次;注册去重由 fpdf 按字体键自持
-	fontBytes map[string][]byte
+	// fonts 已注册字体表(路径 → 合成字体族名):多行文本逐行 DrawText,
+	// 同一路径只读盘/注册一次;文档内嵌去重由 fpdf 按字体键自持
+	fonts map[string]string
 
 	// defaultResolver 后端自带的默认物化器(NewRenderer 接线,可为 nil);
 	// 核心 New 以 nil resolver 组装时经 DefaultResolver 发现并优先采用

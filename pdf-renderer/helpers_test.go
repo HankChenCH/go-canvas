@@ -39,11 +39,12 @@ var (
 func ptr(s string) *string { return &s }
 
 // renderPdfCanvas 经标准管线渲染整画布(NewRenderer 默认接线形态,产物断言为
-// PDF 字节);rs 为 nil 时用临时缓存根的默认物化器(本地路径零 I/O)
+// PDF 字节);rs 为 nil 时用临时缓存根的**默认接线**物化器(QR 缝在位,
+// 本地路径零下载 I/O)
 func renderPdfCanvas(t *testing.T, rs *resolver.ResourceResolver, c *canvas.Canvas) []byte {
 	t.Helper()
 	if rs == nil {
-		rs = resolver.New(resolver.WithCacheRoot(t.TempDir()))
+		rs = NewDefaultResolver(resolver.WithCacheRoot(t.TempDir()))
 	}
 	product, err := renderer.RenderAs[[]byte](context.Background(), NewRenderer(rs), c)
 	if err != nil {
@@ -53,6 +54,22 @@ func renderPdfCanvas(t *testing.T, rs *resolver.ResourceResolver, c *canvas.Canv
 		t.Fatal("PDF 产物为空")
 	}
 	return product
+}
+
+// renderAsPDF / renderAsPDFCtx 指定物化器跑完整管线,返回产物与错误
+// (失败/取消注入面用:错误由调用方 errors.Is 断言,产物断言无逃逸)
+func renderAsPDF(t *testing.T, rs *resolver.ResourceResolver, c *canvas.Canvas) ([]byte, error) {
+	t.Helper()
+	return renderAsPDFCtx(t, context.Background(), rs, c)
+}
+
+func renderAsPDFCtx(t *testing.T, ctx context.Context, rs *resolver.ResourceResolver, c *canvas.Canvas) ([]byte, error) {
+	t.Helper()
+	if rs == nil {
+		rs = resolver.New(resolver.WithCacheRoot(t.TempDir()))
+	}
+	product, err := renderer.RenderAs[[]byte](ctx, NewRenderer(rs), c)
+	return product, err
 }
 
 // renderPdfLayer 单图层便捷渲染,产物断言为 PDF 字节(对齐位图后端 renderLayerProduct)
@@ -265,6 +282,16 @@ func solidPng(t *testing.T, width, height int, c color.NRGBA) string {
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 	draw.Draw(img, img.Bounds(), &image.Uniform{C: c}, image.Point{}, draw.Over)
 	return writePngFixture(t, img)
+}
+
+// writeRawFixture 原始字节夹具落盘(GIF 等无 stdlib 编码器的格式)
+func writeRawFixture(t *testing.T, name string, data []byte) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("写测试图 %s: %v", name, err)
+	}
+	return path
 }
 
 // twoColorPng 左半 one、右半 other 的双色测试图,splitX 为分界列(对齐 PHP 同名方法)
