@@ -2,6 +2,11 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## 1.6.0 - 2026-10-20
+
+- 核心 module renderer 包多页 walk 模板 `RenderPages`（go-pdf-renderer effort 工票 01，canvas-compiler 工票 07「AbstractRenderer 多页钩子」Go 同构）：`RenderPages(ctx, backend, pages []*canvas.Canvas) (any, error)`——逐页 Begin(页宽,页高) → 背景逐页显式铺装（ADR 0022，先色后图）→ 逐层 paint，全部页完成后统一 End 一次（n 页 = n 次 Begin + 1 次 End）；ctx 检查点页间一处新增（下一页 Begin 前），既有根层每图层前/表行每行前检查点同位不动；任一页任一原语/物化失败即 error、End 不达、整个文档无产物逃逸；空页序列守卫按调用侧用法错误处理（错误 code 豁免条款同步扩写）。既有 `Render`/`RenderLayer` 签名与行为零变化（`renderSurface` 页内段抽取 `paintPage`、单页两段式，存量测试保绿），wire 字节面不动（layout-snapshot 无需重导）
+- 新增嵌套 module `pdf-renderer/`（**pdf-renderer/v1.0.0**，Go 侧 PDF 渲染后端，`github.com/go-pdf/fpdf`）：Backend 五原语全实现——px→pt ×0.75（96dpi 口径，页 MediaBox 同口径）、PNG/JPEG/GIF 直嵌（ClipRect 裁目标 + 放置矩阵映射 srcRect→dstRect，EXIF orientation 八向放置矩阵归正，空 srcRect 整图哨兵/空 dstRect 防护不画）、TTF 子集内嵌文本（AddUTF8Font，CJK 硬门槛；TTC 显式拒收；兜底 = PDF 核心字体 Helvetica，ASCII-only 语义对齐位图后端 basicfont）、矩形填充 + 边框盒内色带（borderBands 几何小件与位图后端对称复制）；`NewRenderer` 二维码缝默认接线镜像位图后端；多页入口 `RenderPages`/`RenderPagesAs`（工票 03）消费 `paginate.CompileResult.Canvases` 输出单文档；Begin 文档续页语义 + End 会话复位（复用实例得干净新文档）。验收 = poppler 四件套（pdfinfo/pdftoppm/pdftotext/pdffonts）点位断言，无黄金文件
+
 ## 1.5.0 - 2026-10-19
 
 **Breaking**（ADR 0024，/v2 显式延后）:渲染后端原语 `renderer.Backend.DrawImage` 签名变更为 `DrawImage(src string, srcRect, dstRect image.Rectangle)`——双矩形 blit,原语零 fit 语义、零内在尺寸读取;`srcRect` 空矩形 = 整图哨兵(按解码实际尺寸取整图),`dstRect` 空矩形后端防护不画。Go 生态全第一方锁步升级,/v2 module path 不付,本版以 minor 携 breaking note,外部后端作者出现时再议。
