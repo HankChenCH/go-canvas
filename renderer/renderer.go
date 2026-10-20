@@ -64,6 +64,11 @@ type defaultResolverSource interface {
 // (defaultResolverSource)优先,否则 resolver.New()
 // (对齐 PHP ImageRenderer 的 `$resolver ?? new ResourceResolver()`)
 func New(backend Backend, rs *resolver.ResourceResolver) Renderer {
+	return newTemplate(backend, rs)
+}
+
+// newTemplate 模板组装(New 的实体构造,供包内多入口共享 nil-resolver 归一逻辑)
+func newTemplate(backend Backend, rs *resolver.ResourceResolver) *template {
 	if rs == nil {
 		if src, ok := backend.(defaultResolverSource); ok {
 			rs = src.DefaultResolver()
@@ -81,6 +86,12 @@ func New(backend Backend, rs *resolver.ResourceResolver) Renderer {
 // 过滤在建面循环之前,隐藏层的绘制分派与惰性物化均不发生。
 // 背景只随 Render(画布)走(ADR 0022 / spec §4 Q9):RenderLayer 无画布矩形语义不画
 func (r *template) Render(ctx context.Context, c *canvas.Canvas) (any, error) {
+	return r.renderSurface(ctx, c.Width(), c.Height(), visibleLayers(c), c.Background())
+}
+
+// visibleLayers 画布根层显隐过滤(layer-panel-ux 工单 01,隐藏=最终输出排除):
+// Render 与 renderPages 共享的画布渲染循环前置段,过滤先于建面与任何绘制分派
+func visibleLayers(c *canvas.Canvas) []layer.Layer {
 	layers := c.GetLayers()
 	visible := make([]layer.Layer, 0, len(layers))
 	for _, l := range layers {
@@ -88,7 +99,7 @@ func (r *template) Render(ctx context.Context, c *canvas.Canvas) (any, error) {
 			visible = append(visible, l)
 		}
 	}
-	return r.renderSurface(ctx, c.Width(), c.Height(), visible, c.Background())
+	return visible
 }
 
 // RenderLayer implements Renderer:以其自身尺寸建面,物化时机同 Render(惰性)。
@@ -101,21 +112,62 @@ func (r *template) RenderLayer(ctx context.Context, l layer.Layer) (any, error) 
 	return r.renderSurface(ctx, p.Width(), p.Height(), []layer.Layer{l}, nil)
 }
 
-// renderSurface 建面 → 背景铺装 → 逐层 paint → 收尾;任一原语/物化报错即中止(渲染面丢弃)。
+// renderSurface 建面 → 背景铺装 → 逐层 paint → 收尾(单页编排:页内段 +
+// End 收尾两段式,页内段与多页 renderPages 共享);
+// 任一原语/物化报错即中止(渲染面丢弃)。
 // 根层循环每图层前设控制面检查点(与 php render 根层循环同位,工票 03):
 // ctx 到期/取消报渲染 code,先于下一层的绘制分派与惰性物化
 func (r *template) renderSurface(ctx context.Context, width, height int, layers []layer.Layer, background *canvas.CanvasBackground) (any, error) {
-	if err := r.backend.Begin(width, height); err != nil {
+	if err := r.paintPage(ctx, width, height, layers, background); err != nil {
 		return nil, err
 	}
+	return r.backend.End(), nil
+}
+
+// paintPage 单页段:建面 → 背景铺装 → 逐层 paint(不含 End 收尾)。
+// 单页 renderSurface 与多页 renderPages 共享的页内编排——多页是本段的页循环
+// 外扩(canvas-compiler 工票 07「每页一次 begin/walk,单文档统一 end」);
+// 根层循环每图层前设控制面检查点(与 php render 根层循环同位,ADR 0008):
+// ctx 到期/取消报渲染 code,先于下一层的绘制分派与惰性物化
+func (r *template) paintPage(ctx context.Context, width, height int, layers []layer.Layer, background *canvas.CanvasBackground) error {
+	if err := r.backend.Begin(width, height); err != nil {
+		return err
+	}
 	if err := r.paintBackground(ctx, background, width, height); err != nil {
-		return nil, err
+		return err
 	}
 	for _, l := range layers {
 		if err := resolver.CheckContext(ctx); err != nil {
-			return nil, err
+			return err
 		}
 		if err := r.paint(ctx, l, 0, 0, width, height); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// renderPages 多页编排:逐页复用单页段(建面→背景铺装→逐层 paint),全部页
+// 完成后单文档统一 End 一次(canvas-compiler 工票 07 的 Go 同构物,工票 01)。
+// ctx 检查点页间一处新增(下一页 Begin 前,ADR 0008)——首页前不另设检查点,
+// 与单页 Render 同构;页内既有根层每图层前/表行每行前检查点不动。
+// 显隐过滤逐页进行(与 Render 同语义);任一页任一原语/物化失败即中止,
+// End 不达、整个文档无产物逃逸
+func (r *template) renderPages(ctx context.Context, pages []*canvas.Canvas) (any, error) {
+	if len(pages) == 0 {
+		// 空页序列属调用侧用法错误(零页文档无意义,不设 code):不触达任何原语,
+		// 「0 次 Begin + 1 次 End」的空文档语义不由模板代答
+		return nil, fmt.Errorf("RenderPages: 页序列为空,至少需要一页")
+	}
+	for i, c := range pages {
+		if i > 0 {
+			// 页间检查点(ADR 0008,本票唯一新增):先于下一页的建面与背景物化
+			// 掐断已取消/到期的 ctx,报渲染稳定 code
+			if err := resolver.CheckContext(ctx); err != nil {
+				return nil, err
+			}
+		}
+		if err := r.paintPage(ctx, c.Width(), c.Height(), visibleLayers(c), c.Background()); err != nil {
 			return nil, err
 		}
 	}
