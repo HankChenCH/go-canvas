@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Go 移植版画布渲染库 `github.com/HankChenCH/go-canvas`：与 `php-canvas-next`（PHP 权威端，本地同级 `../php-canvas-next`）共享同一领域语言与 graph wire 契约——`layer.Node` 逐字段键级对齐 PHP 各图层 `graph()` 产物，同一份 graph JSON 双端互读。核心 module **纯 stdlib 零第三方依赖**（ADR-0002）；位图后端是嵌套 module `image-renderer/`（消费方走 module proxy 解析核心已发布 tag，本地双 module 联调经仓库根 `go.work`）。Go 1.25。中文是代码注释的工作语言；commit 用 conventional-commit 前缀 + 中文 subject。
+Go 移植版画布渲染库 `github.com/HankChenCH/go-canvas`：与 `php-canvas-next`（PHP 权威端，本地同级 `../php-canvas-next`）共享同一领域语言与 graph wire 契约——`layer.Node` 逐字段键级对齐 PHP 各图层 `graph()` 产物，同一份 graph JSON 双端互读。核心 module **纯 stdlib 零第三方依赖**（ADR-0002）；渲染后端是嵌套 module `image-renderer/`（位图）与 `pdf-renderer/`（PDF）（消费方走 module proxy 解析核心已发布 tag，本地双 module 联调经仓库根 `go.work`）。Go 1.25。中文是代码注释的工作语言；commit 用 conventional-commit 前缀 + 中文 subject。
 
 ## Layout
 
@@ -17,15 +17,16 @@ Go 移植版画布渲染库 `github.com/HankChenCH/go-canvas`：与 `php-canvas-
 - `resolver/` — 资源物化（下载/缓存/QR 缝），结果回写图层（`SetResolvedSrc/SetResolvedFont`）；画布级入口 `ResolveBackground`（背景图不是图层，物化结果以返回值交渲染器，img_layers 同目录同语义）。`Resolve` 全画布预遍历 API 保留但渲染器不再调用（角色 = 绘制时物化）。
 - `text/` — 断行/度量契约 + 对齐版默认实现；注入点在 `layer.TextLayer`。
 - `image-renderer/` — 嵌套 module：位图后端（`imagerenderer.Renderer` 实现 Backend；`NewRenderer` 返回携带默认物化器——二维码缝默认接线——的具体后端，配 `RenderAs` 即完整管线）+ `typography/` 增强文本 + `cmd/visualcheck` 目验样图。
+- `pdf-renderer/` — 嵌套 module：PDF 后端（`pdfrenderer.Renderer` 实现 Backend，End 产物 `[]byte`；`NewRenderer` 镜像位图后端默认接线）。px→pt ×0.75、PNG/JPEG/GIF 直嵌（clip + 放置矩阵）、TTF 子集内嵌文本（TTC 不支持，兜底 = 核心字体 Helvetica）、EXIF 经放置矩阵归正；Begin 文档续页语义为工票 03 多页入口预留。poppler 验收四件套与字体陷阱见包内 AGENTS.md；`cmd/visualcheck` 出 .pdf + 预览 png。
 - 语义语料（工票 07 起消费翻转）：语料仓 `canvas-semantics` 以 **submodule pin** 进仓（语义权威，PHP/Go/TS 三端平等消费，语料 diff 即语义变更、升级 = 一次可审的指针移动），runner 直接读 `canvas-semantics/corpus/`：`hydrate/corpus_test.go`（expression-eval v3.0 四模块 107 用例 + fn-date 内 dateTokens 15 行（v3.0 = 提案 0002 季度 token Q 收编），token 表表面对 = `hydrate/dateformat_test.go`；expand-semantics v1.1 = 29 用例，expect.warnings 软诊断序列比对 = code + path + 序列序）、`paginate/semantics_test.go`（paginate-semantics v1.0 = 12 用例 + flow-semantics v1.1 = 23 用例含软诊断面），随常规 `go test` 运行。**fresh clone 先 `git submodule update --init`**（runner 未检出即红，无降级路径）。支持面声明 = 仓根 `support-surface.json`（渲染端四契约全模块，声明即 runner 套件必须绿；CI core job 以语料仓内 canvasctl `validate --surface` 三互检，工票 08）。`renderer/testdata/layout-snapshot.json` 是布局快照（wire 字节面，PHP 导出、非语料），见 `docs/layout-snapshot.md`。
 
 ## Commands
 
 ```sh
-make test             # 核心 module + image-renderer 两轮 go test(含语义语料 runner,需先检出 submodule)
+make test             # 核心 module + image-renderer + pdf-renderer 三轮 go test(含语义语料 runner,需先检出 submodule)
 make vet
 make layout-snapshot  # PHP 导出布局快照（需 PHP 8.3 + ext-intl），人审 diff 后随代码提交
-make visual-check     # 目验样图 → image-renderer/visual-check.png
+make visual-check     # 目验样图:位图 → image-renderer/visual-check.png;PDF → pdf-renderer/visual-check.pdf(+png 预览,poppler 在场)
 ```
 
 fresh clone 先 `git submodule update --init`（语料仓未检出 runner 即红）。Homebrew PHP 是 keg-only：`export PATH="$(brew --prefix)/opt/php@8.3/bin:$PATH"`（仅 `make layout-snapshot` 需要）。Go CI 不装 PHP——语义语料经 submodule 检出，布局快照 JSON 提交进本仓库、仅人工触发再生成。
@@ -35,7 +36,7 @@ fresh clone 先 `git submodule update --init`（语料仓未检出 runner 即红
 - **依赖方向单向**：Renderer → Canvas → Layer；`hydrate` 属结构侧（只可 import canvas/layer，不得引 renderer/resolver）；核心 module 保持零第三方依赖——把图像/文本库引回核心是回归。图层 setter 禁止 I/O，物化只发生在 `resolver`。
 - **标准管线**（V2）：`renderer.Render(hydrate.NewHydrator(nil).Hydrate(canvas, dataset))`——填充（数据维度，渲染前纯结构）与物化（资源维度，绘制分派前惰性）两维分离；dataset nil 或无绑定画布，两步均恒等直通（返回原画布对象）。
 - **wire 条件写键（V2）**：模板态 TableLayer 写 `data`/`template`、不写 `rows`；V1 态恒写 `rows`、不写 `template`/`data`（template ⊕ rows XOR，双键同现报 `ErrTemplateRowsConflict`）。`"template": null` 与缺键同判。表达式标记：TextLayer 恒写三键 data，Image/Qr 仅标记态写 `expression` 键（保 Go↔PHP 字节 parity）；`data.value` 恒镜像表达式原文，求值结果永不落 graph。
-- **错误 code 是三端契约**（spec §5.2）：sentinel + `%w` 包装，`errors.Is` 判定；sentinel 值 = 稳定 code（静态文案码带描述，上下文码 bare + wrap）。消息可改、**code 不可改**；新增错误必须归入解码/填充/绘制三阶段之一。唯一豁免：调用侧用法错误（如 `RenderAs[T]` 的期望类型与后端产物不符，工票 13）发生在渲染成功之后，不属渲染失败，普通可读 error 即可、不设 code。
+- **错误 code 是三端契约**（spec §5.2）：sentinel + `%w` 包装，`errors.Is` 判定；sentinel 值 = 稳定 code（静态文案码带描述，上下文码 bare + wrap）。消息可改、**code 不可改**；新增错误必须归入解码/填充/绘制三阶段之一。唯一豁免：调用侧用法错误不设 code、普通可读 error 即可，覆盖两类——①**渲染面触达之前**的用法错误（如 `RenderPages` 空页序列守卫：零页文档无意义，未触达任何原语，「0 次 Begin + 1 次 End」的空文档语义不由模板代答）；②**渲染成功之后**的用法错误（如 `RenderAs[T]`/`RenderPagesAs[T]` 的期望类型与后端产物不符，工票 13，断言发生在渲染成功后）。两者都不属解码/填充/绘制任一阶段的渲染失败。
 - **`Data` 的 `MarshalJSON` 分形态**：`RowsPath` 非空 = 表格形态仅一键。给 `Data` 加字段先想清楚属于哪个形态；Image/Qr 的 `value` 恒写键（可为 null）不可加 omitempty。
 - **填充器的图改写**：模板行每行独立 `json.Unmarshal` 模板载荷（PHP 数组值拷贝同款）——Node 的 `Rows/Cells` 是指针切片、`Content/Template` 是 RawMessage，直接浅拷贝改写会跨行别名；`Hydrate` 不回写源画布有单测锁定。
 - **wire 字节面 / 语义改动**：字节面改动必须 `make layout-snapshot` 重导出并人审 diff（存量用例零 diff = 存量图字节等价）；表达式/填充等编译语义改动走语料仓提案通道（`canvas-semantics/proposals/`），本仓随 submodule 指针移动跟进，runner 红即实现未跟上语义。

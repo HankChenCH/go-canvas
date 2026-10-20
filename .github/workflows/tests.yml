@@ -53,3 +53,24 @@ jobs:
         run: go test ./...
         env:
           GOWORK: 'off'
+
+  pdf-renderer:
+    name: pdf-renderer (consumer resolution, GOWORK=off)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pdf-renderer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: pdf-renderer/go.mod
+      # poppler 四件套(pdfinfo/pdftoppm/pdftotext/pdffonts)是验收工具链;
+      # CJK 腿的确定性依赖单体 TTF 字体(fonts-ipafont-gothic,TTF)
+      - name: Install poppler-utils and IPA Gothic font
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils fonts-ipafont-gothic
+      # 模拟真实消费方:GOWORK=off 且无 replace,核心 module 走 module proxy 解析
+      - name: Run tests against module proxy
+        run: go test ./...
+        env:
+          GOWORK: 'off'
