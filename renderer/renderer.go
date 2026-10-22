@@ -293,6 +293,10 @@ func (r *template) paintCell(ctx context.Context, l *layer.TableCellLayer, x, y 
 // 四档 fit 的几何全部在此算定(白名单分派,未知值落 cover 臂)——
 // cover 等比居中裁窗 / fill 整图(与 cover 同门 dstRect,唯一差别在 srcRect)/
 // contain 收缩(ADR 0023 语义不动)/ tile 可见块逐块 blit。
+// clip 声明(ADR 0026)改写绘制形态:circle 档且后端实现形状能力口走圆形三步
+// (背景填进内切圆、内容按 fit 绘出后遮罩 blit、边框沿圆周描环),矩形盒
+// DrawRect/DrawImage 路径不参与;未知 clip 值与后端缺能力口降级矩形
+// (fit 未知值纪律同门)。
 // 内在尺寸读取为全 fit 前置:绘制分派点一次(image.DecodeConfig 属绘制分派期 I/O,
 // 只读头块,与 resolve 同批语义;注册集 PNG/JPEG/GIF 与位图后端解码集一致),
 // 读取失败统一退化 fill 形态——真损坏图在后端解码处照旧报错,渲染结局与迁移前 parity。
@@ -301,6 +305,14 @@ func (r *template) paintImage(ctx context.Context, l *layer.ImageLayer, x, y int
 	if err := r.resolver.ResolveLayer(ctx, l); err != nil {
 		return err
 	}
+
+	// 圆形档(ADR 0026):clip 白名单 + 后端能力口探测双门,否则矩形路径照旧
+	if l.Clip() == layer.ClipCircle {
+		if sb, ok := r.backend.(ShapeCapableBackend); ok {
+			return r.paintImageCircle(sb, l, x, y)
+		}
+	}
+
 	if err := r.backend.DrawRect(x, y, l.Width(), l.Height(), l.Background(), l.Border()); err != nil {
 		return err
 	}
@@ -310,36 +322,78 @@ func (r *template) paintImage(ctx context.Context, l *layer.ImageLayer, x, y int
 		return nil
 	}
 
+	// 矩形路径:fit 分派层算定几何、DrawImage 原语直绘
+	return r.paintFitBlits(l, *src, x, y, func(src string, srcRect, dstRect image.Rectangle) error {
+		return r.backend.DrawImage(src, srcRect, dstRect)
+	})
+}
+
+// paintImageCircle 圆形档三步(ADR 0026,完整圆形框——整层渲染面裁进内切圆):
+// ① 背景色填充进内切圆(矩形盒 DrawRect 不画——背景/边框都不落矩形盒);
+// ② 内容按 fit 绘出后遮罩 blit 进圆(fit 几何照旧,只换成掩码形态原语,
+// 掩码矩形 = 内切圆矩形,内在尺寸不可用退化 fill 形态再裁圆);
+// ③ 边框沿圆周描成环(描边参数解析规则见 ImageLayer.CircleStroke)。
+// 内切圆边长 ≤0(内容区被 padding 吃满)零几何零绘制。
+// 本方法私有且仅由 paintImage 的能力口探测(类型断言)命中臂调用——
+// DrawEllipse/DrawImageMasked 只在实现了 ShapeCapableBackend 的后端上存在
+func (r *template) paintImageCircle(sb ShapeCapableBackend, l *layer.ImageLayer, x, y int) error {
+	circle := l.InscribedCircleRect().Add(image.Pt(x, y))
+	if circle.Dx() <= 0 || circle.Dy() <= 0 {
+		return nil
+	}
+
+	if err := sb.DrawEllipse(circle.Min.X, circle.Min.Y, circle.Dx(), circle.Dy(), l.Background(), nil); err != nil {
+		return err
+	}
+
+	if src := l.ResolvedSrc(); src != nil {
+		if err := r.paintFitBlits(l, *src, x, y, func(src string, srcRect, dstRect image.Rectangle) error {
+			return sb.DrawImageMasked(src, srcRect, dstRect, circle)
+		}); err != nil {
+			return err
+		}
+	}
+
+	if stroke := l.CircleStroke(); stroke != nil {
+		return sb.DrawEllipse(circle.Min.X, circle.Min.Y, circle.Dx(), circle.Dy(), nil, stroke)
+	}
+	return nil
+}
+
+// paintFitBlits 全 fit 白名单分派(cover/fill/contain/tile + 内在尺寸退化),blit 落点
+// 由调用臂注入(矩形路径 DrawImage / 圆形路径 DrawImageMasked)——
+// 两形态共用同一份分派几何防数学漂移(先绘后裁,fit 与 clip 正交)
+func (r *template) paintFitBlits(l *layer.ImageLayer, src string, x, y int, blit func(src string, srcRect, dstRect image.Rectangle) error) error {
 	// cover/fill 共用目标矩形(同门):getImageOrigin + 内容宽高
 	originX, originY := l.ImageOrigin()
 	dst := image.Rect(x+originX, y+originY, x+originX+l.ContentWidth(), y+originY+l.ContentHeight())
 
-	imgWidth, imgHeight, ok := intrinsicSize(*src)
+	imgWidth, imgHeight, ok := intrinsicSize(src)
 	if !ok {
 		// 内在尺寸不可用:整图拉伸进目标矩形(fill 形态),srcRect 零哨兵由后端按解码实际尺寸取整图
-		return r.backend.DrawImage(*src, image.Rectangle{}, dst)
+		return blit(src, image.Rectangle{}, dst)
 	}
 
 	switch l.Fit() {
 	case layer.FitContain:
 		// contain(ADR 0023):按内在比例收缩目标矩形再整图 blit
 		cx, cy, cw, ch := l.ContainRect(imgWidth, imgHeight)
-		return r.backend.DrawImage(*src, image.Rect(0, 0, imgWidth, imgHeight),
+		return blit(src, image.Rect(0, 0, imgWidth, imgHeight),
 			image.Rect(x+cx, y+cy, x+cx+cw, y+cy+ch))
 	case layer.FitTile:
 		// tile:可见块逐块 blit(src/dst 可见子矩形 1:1),裁切纯几何完成、原语零裁剪参数
 		for _, block := range l.TileRects(imgWidth, imgHeight) {
-			if err := r.backend.DrawImage(*src, block.Src, block.Dst.Add(image.Pt(x, y))); err != nil {
+			if err := blit(src, block.Src, block.Dst.Add(image.Pt(x, y))); err != nil {
 				return err
 			}
 		}
 		return nil
 	case layer.FitFill:
 		// fill:整图进与 cover 相同的目标矩形(非等比拉伸,不裁切不留空隙)
-		return r.backend.DrawImage(*src, image.Rect(0, 0, imgWidth, imgHeight), dst)
+		return blit(src, image.Rect(0, 0, imgWidth, imgHeight), dst)
 	default:
 		// cover(缺省/显式 cover 归一/未知值白名单外降级):等比居中裁窗
-		return r.backend.DrawImage(*src, l.CoverRect(imgWidth, imgHeight), dst)
+		return blit(src, l.CoverRect(imgWidth, imgHeight), dst)
 	}
 }
 

@@ -9,6 +9,14 @@
 - 新增 `paginate/rowsplit.go`：`rowLineStats`/`splitBound`/`splitRowGraph` 三件套纯函数（PHP `Compiler\RowSplitter` 逐镜像，零 I/O 零渲染依赖，`layer/text.go` 只读复用；格独立分片、按 `\n` 硬断行切片、P<0 / 续段≤0 / L≤0 防线成对平移；Node 深拷贝键形逐字段克隆 = wire 字节面纪律）
 - 语料消费：`corpus/surface.go` paginate 常量 → v2.1（20 例全量消费），submodule pin 移动 canvas-semantics `3d8ed35`（提案 003 转正 + 混合格期望值勘误 meta.errata），`support-surface.json` 重签 v2.1
 - 测试：`rowsplit_test.go` 12 例镜像 PHP `RowSplitterTest`（含收敛结构断言 [10,10,3]）+ `paginator_test.go` 入口守卫/分页关 `split` 无效补锁 2 例；两嵌套 module（image-renderer / pdf-renderer）与核心 module 其余包零改动
+## 1.7.0 - 2026-10-20
+
+**Breaking**（ADR 0026，接口扩展，/v2 显式延后）:渲染后端契约新增可选形状能力口 `renderer.ShapeCapableBackend`（嵌入 `Backend` 的加法接口，两新原语 `DrawEllipse(x, y, w, h, fillColor, stroke)` 与 `DrawImageMasked(src, srcRect, dstRect, maskRect)`）——既有 `Backend` 实现零破坏（接口探测为可选能力口，未实现者对 clip 声明静默降级矩形渲染），希望承接圆形档的后端按新接口补两原语。Go 生态全第一方锁步升级，本版以 minor 携 breaking note（ADR 0024 先例），外部后端作者出现时再议 /v2。
+
+- 图片层裁剪形状 clip 跟随（与 `php-canvas-next` 对等，ADR 0026 裁剪形状圆形档）：`layer.ImageLayer` 增 `ClipRect`/`ClipCircle` 常量与 `SetClip`/`Clip`（空串 = rect 缺省，显式 rect 归一空串，未知值宽容透传，与 src/fit 正交）；wire 条件写键（缺省整键不落、殿后 spec 末位 fit 之后，键序 shape/align/position/fit/clip，缺省态字节面与无字段版本一致），存量 wire 断言按设计保绿（layout-snapshot 存量零 diff 无需重导）；hydrate/expand 对 spec 仅透传（`image-fit-spec-passthrough` 锚点普适语义覆盖，零改动）
+- 内切圆与圆周描边纯函数（与 PHP 同公式、整除向零截断同门）：`ImageLayer.InscribedCircleRect`（边长 = min(内容区宽高)、盒内对齐定位——center 取整盒中点、left/top 贴 padding 原点侧、非方盒恒正方几何留透明边不变形为椭圆）、`ImageLayer.CircleStroke`（宽取四边已声明宽最小值、色按 top→right→bottom→left 取首个非空边色、四边全未声明不描边；未声明或 width≤0 的边不计，与 borderBands 同纪律）
+- 渲染臂圆形档三步分派：`paintImage` 双门（clip 白名单 + `ShapeCapableBackend` 类型断言）命中走 `paintImageCircle`——① 椭圆背景填充（矩形盒 DrawRect 不画）→ ② 内容按 fit 绘出后遮罩 blit（掩码矩形 = 内切圆矩形）→ ③ 边框沿圆周描环；未知 clip 值与后端缺能力口降级矩形路径（fit 未知值纪律同门），内切圆边长 ≤0 零几何零绘制，内在尺寸不可用退化 fill 形态再裁圆（ADR 0024 纪律）；fit 分派几何抽 `paintFitBlits` 两形态共用同一份防数学漂移（先绘后裁，fit 与 clip 正交）
+- 嵌套 module `image-renderer`（**v1.2.0**，核心与位图后端锁步 minor）两原语实现（stdlib draw 掩码面，二值覆盖无抗锯齿对齐 PHP GD 驱动形态）：`DrawEllipse`（draw.DrawMask 椭圆填充 + 外缘内缩环带描边——内缩带与 DrawRect 盒内嵌边带同门）与 `DrawImageMasked`（blit 前段抽 `blitSource` 与 DrawImage 同源 + 椭圆掩码逐像素置透明）；像素点位平移 PHP 矩阵（四角透明露下层、圆心为图、环带为描边色、padding 留白、非方盒正圆透明边、circle × fit 四档组合、未知 clip 值降级矩形），无黄金文件
 
 ## 1.6.0 - 2026-10-20
 

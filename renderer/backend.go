@@ -41,3 +41,23 @@ type Backend interface {
 		angle int,
 	) error
 }
+
+// ShapeCapableBackend 形状能力口(ADR 0026):渲染后端可选实现的加法原语对——
+// 椭圆绘制(fill + stroke 一体)与椭圆掩码 blit(掩码 = 内切于给定矩形的椭圆,
+// 分派层传正方形即圆)。原语零形状语义、零 fit 语义,几何全在分派层
+// (ADR 0024 方向延续);分派层以类型断言探测本接口,未实现的后端对 clip 声明
+// 降级矩形路径,既有 Backend 实现零破坏(接口面扩展携 CHANGELOG breaking note,
+// ADR 0024 先例)
+type ShapeCapableBackend interface {
+	Backend
+
+	// DrawEllipse 椭圆绘制原语:在 (x, y) 起的 width×height 外接矩形内画内切椭圆。
+	// fillColor 填充(nil/空串跳过)、stroke 圆周描边(nil 不描,形态同边框边目)
+	DrawEllipse(x, y, width, height int, fillColor *string, stroke *layer.BorderSide) error
+
+	// DrawImageMasked 掩码 blit 原语(DrawImage 的掩码形态):双矩形 blit(语义与
+	// DrawImage 完全一致,含 srcRect 空矩形整图哨兵)后,以 maskRect 外接矩形的
+	// 内切椭圆为掩码裁切——掩码外透明。掩码矩形是画布绝对坐标,与目标矩形独立
+	// (分派层传正方形即圆)
+	DrawImageMasked(src string, srcRect, dstRect, maskRect image.Rectangle) error
+}
