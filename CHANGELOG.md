@@ -2,6 +2,12 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## 1.9.0 - 2026-10-22
+
+- 谱系修复（example 集成消费 v1.8.0 时暴露）：v1.8.0 误自 v1.6.0 谱系切出发布——v1.7.0 的 ADR 0026 全部功能面（`renderer.ShapeCapableBackend` 形状能力口、图片层 clip 圆形档、内切圆/圆周描边纯函数、嵌套 image-renderer 两原语）不在其中，与已发布嵌套 module（image-renderer v1.2.0 / pdf-renderer v1.1.0，均引用形状口）编译不兼容。本版 = `feat/image-clip-circle`（v1.7.0 谱系，tip 081238a）并回 main 的并集发布：v1.7.0 ∪ v1.8.0，三 module 全量测试绿（含 paginate 语料 20 例与 layout-snapshot）
+- 嵌套 module 零重发：image-renderer v1.2.0 / pdf-renderer v1.1.0 对本版超集编译兼容（go.mod 依赖约束经 MVS 解析到本版）
+- paginate 逐行拆分分页面与 v1.8.0 一致（提案 003，paginate-semantics v2.1），零行为变化
+
 ## 1.8.0 - 2026-10-22
 
 - 模板表逐行拆分分页模式（与 `php-canvas-next` v2.3.0 对等，提案 003，paginate-semantics v2.0 转正 + v2.1 勘误；row-split-pagination effort）：`paginate.PaginateOptions` 新增 `Split *string` 指针字段（缺席 = nil 原子模式，行为零变化）——枚举闭集 v1 仅 `"lines"`，值 ∉ 闭集 = `ErrPaginateOptionInvalid` 在 `Paginate` 入口 fail-fast（与分页开关正交恒执行，PHP 构造期抛出的同构收敛；新 sentinel 已入 semantics_test corpusErrorCodes 与 wire_test 稳定码逐字断言）
