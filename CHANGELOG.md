@@ -2,6 +2,14 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## 1.8.0 - 2026-10-22
+
+- 模板表逐行拆分分页模式（与 `php-canvas-next` v2.3.0 对等，提案 003，paginate-semantics v2.0 转正 + v2.1 勘误；row-split-pagination effort）：`paginate.PaginateOptions` 新增 `Split *string` 指针字段（缺席 = nil 原子模式，行为零变化）——枚举闭集 v1 仅 `"lines"`，值 ∉ 闭集 = `ErrPaginateOptionInvalid` 在 `Paginate` 入口 fail-fast（与分页开关正交恒执行，PHP 构造期抛出的同构收敛；新 sentinel 已入 semantics_test corpusErrorCodes 与 wire_test 稳定码逐字断言）
+- 拆分语义：可拆行（全文本格且内容行数 ≥ 2）在页界即拆，拆分界 K = min(floor(剩余空间/L), M_max−1) ≥ 1 时前段入当前页、封页，续段等价新行重入装箱（可再拆，片段内容行数严格递减 → 必然收敛），行退为最终原子；装箱循环改决策表四支（装入/拆分/truncate/整行下页，装箱单位改行 graph + worklist 保序消费），拆分分支先于 truncate/overflow 判定——truncate 同步收窄为仅对不可拆行生效；页组装零改动
+- 新增 `paginate/rowsplit.go`：`rowLineStats`/`splitBound`/`splitRowGraph` 三件套纯函数（PHP `Compiler\RowSplitter` 逐镜像，零 I/O 零渲染依赖，`layer/text.go` 只读复用；格独立分片、按 `\n` 硬断行切片、P<0 / 续段≤0 / L≤0 防线成对平移；Node 深拷贝键形逐字段克隆 = wire 字节面纪律）
+- 语料消费：`corpus/surface.go` paginate 常量 → v2.1（20 例全量消费），submodule pin 移动 canvas-semantics `3d8ed35`（提案 003 转正 + 混合格期望值勘误 meta.errata），`support-surface.json` 重签 v2.1
+- 测试：`rowsplit_test.go` 12 例镜像 PHP `RowSplitterTest`（含收敛结构断言 [10,10,3]）+ `paginator_test.go` 入口守卫/分页关 `split` 无效补锁 2 例；两嵌套 module（image-renderer / pdf-renderer）与核心 module 其余包零改动
+
 ## 1.6.0 - 2026-10-20
 
 - 核心 module renderer 包多页 walk 模板 `RenderPages`（go-pdf-renderer effort 工票 01，canvas-compiler 工票 07「AbstractRenderer 多页钩子」Go 同构）：`RenderPages(ctx, backend, pages []*canvas.Canvas) (any, error)`——逐页 Begin(页宽,页高) → 背景逐页显式铺装（ADR 0022，先色后图）→ 逐层 paint，全部页完成后统一 End 一次（n 页 = n 次 Begin + 1 次 End）；ctx 检查点页间一处新增（下一页 Begin 前），既有根层每图层前/表行每行前检查点同位不动；任一页任一原语/物化失败即 error、End 不达、整个文档无产物逃逸；空页序列守卫按调用侧用法错误处理（错误 code 豁免条款同步扩写）。既有 `Render`/`RenderLayer` 签名与行为零变化（`renderSurface` 页内段抽取 `paintPage`、单页两段式，存量测试保绿），wire 字节面不动（layout-snapshot 无需重导）
