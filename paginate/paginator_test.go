@@ -6,6 +6,7 @@ package paginate_test
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/HankChenCH/go-canvas/canvas"
@@ -65,5 +66,42 @@ func TestSplitWithoutBackgroundKeepsLegacyCanvasSection(t *testing.T) {
 		if string(raw) != want {
 			t.Errorf("页 %d canvas 段不符:\n got  %s\n want %s", i, raw, want)
 		}
+	}
+}
+
+func TestSplitOptionInvalidRejectedAtPaginate(t *testing.T) {
+	// 入口枚举守卫(提案 003,paginate_option_invalid):语料只钉字符串 "rows" 一例;
+	// 本文件补锁空串/大小写/尾随空格(枚举闭集 v1 仅小写 "lines"),且守卫与分页
+	// 开关正交——分页关同样报(Go 裁决在 Paginate 入口,PHP 构造期抛出的同构收敛)
+	c := canvas.New(200, 120, driverTable())
+	for _, bad := range []string{"rows", "", "Lines", "lines "} {
+		_, err := paginate.NewPaginator(paginate.PaginateOptions{PageHeight: pageHeightPtr(250), Split: strp(bad)}).Paginate(c)
+		if !errors.Is(err, paginate.ErrPaginateOptionInvalid) {
+			t.Errorf("split %q: err = %v, want paginate_option_invalid", bad, err)
+		}
+
+		_, err = paginate.NewPaginator(paginate.PaginateOptions{Split: strp(bad)}).Paginate(c)
+		if !errors.Is(err, paginate.ErrPaginateOptionInvalid) {
+			t.Errorf("分页关 split %q: err = %v, want paginate_option_invalid(守卫正交)", bad, err)
+		}
+	}
+
+	// 合法值:nil(缺席 = 原子模式)与 "lines" 均通过入口
+	if _, err := paginate.NewPaginator(paginate.PaginateOptions{Split: strp("lines")}).Paginate(c); err != nil {
+		t.Errorf("split=lines 合法值不得报错: %v", err)
+	}
+}
+
+func TestSplitOptionIgnoredWhenPaginationOff(t *testing.T) {
+	// 分页关时 split 键不改变行为(直通 + 溢出判定,与原子模式同果):
+	// 语料 split-lines-key-ineffective-when-pagination-off 的对象级同构补锁
+	c := canvas.New(200, 120, driverTable())
+
+	pages, err := paginate.NewPaginator(paginate.PaginateOptions{Split: strp("lines")}).Paginate(c)
+	if err != nil {
+		t.Fatalf("Paginate: %v", err)
+	}
+	if len(pages) != 1 || pages[0] != c {
+		t.Fatalf("分页关应单页直通且与入参同实例, 得 %d 页", len(pages))
 	}
 }

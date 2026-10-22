@@ -96,6 +96,22 @@ func TestPaginateOptionsDecode(t *testing.T) {
 		t.Error("Truncate = false, want true")
 	}
 
+	// split 键(提案 003):指针区分缺席(nil = 原子模式),键在值落位
+	var withSplit PaginateOptions
+	if err := json.Unmarshal([]byte(`{"pageHeight": 250, "split": "lines"}`), &withSplit); err != nil {
+		t.Fatalf("解码 split 选项: %v", err)
+	}
+	if withSplit.Split == nil || *withSplit.Split != "lines" {
+		t.Errorf("Split = %v, want &%q", withSplit.Split, "lines")
+	}
+	var bareSplit PaginateOptions
+	if err := json.Unmarshal([]byte(`{"pageHeight": 250}`), &bareSplit); err != nil {
+		t.Fatalf("解码缺 split 选项: %v", err)
+	}
+	if bareSplit.Split != nil {
+		t.Errorf("Split 缺席应得 nil(原子模式), got %v", *bareSplit.Split)
+	}
+
 	// pageHeight: 0 是合法解码值(几何校验 page_geometry_invalid 属分页期语义,
 	// 裁决在 Paginate 入口)——选项类型不得吞掉 0 与缺席的区分
 	var zero PaginateOptions
@@ -124,6 +140,7 @@ func TestStableErrorCodes(t *testing.T) {
 		{ErrContentOverflow, "content_overflow"},
 		{ErrPaginateTargetInvalid, "paginate_target_invalid"},
 		{ErrPageGeometryInvalid, "page_geometry_invalid"},
+		{ErrPaginateOptionInvalid, "paginate_option_invalid"},
 		{ErrFlowChainInvalid, "flow_chain_invalid"},
 		{ErrFlowRowsPathInconsistent, "flow_rows_path_inconsistent"},
 	}
