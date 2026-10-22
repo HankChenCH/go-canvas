@@ -19,7 +19,7 @@ import (
 const (
 	ContractExpressionEval = "expression-eval v3.0"
 	ContractExpand         = "expand-semantics v1.1"
-	ContractPaginate       = "paginate-semantics v1.0"
+	ContractPaginate       = "paginate-semantics v2.1"
 	ContractFlow           = "flow-semantics v1.1"
 )
 

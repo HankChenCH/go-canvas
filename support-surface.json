@@ -26,9 +26,9 @@
         },
         {
             "id": "paginate-semantics",
-            "version": "v1.0",
+            "version": "v2.1",
             "moduleFiles": [
-                { "id": "paginate", "support": "supported", "note": "" }
+                { "id": "paginate", "support": "supported", "note": "v2.1 = v2.0 勘误版（混合格用例期望内容层宽归一）；逐行拆分 split 随提案 003 v2.0 支持" }
             ]
         },
         {

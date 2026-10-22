@@ -4,7 +4,9 @@ package paginate_test
 // canvas-semantics(本仓 pin 消费,镜像副本已删除),两份语料逐用例驱动 Go 管线
 // 「解码 → paginate/compile 入口 → 比对 expect(页 graph 列表或 errorCode)」。
 //
-//   - corpus/paginate-semantics/v1.0/paginate.json(paginate-semantics v1.0,12 用例)
+//   - corpus/paginate-semantics/v2.1/paginate.json(paginate-semantics v2.1,20 用例;
+//     v2.1 = v2.0 勘误版,混合格用例期望内容层宽随重建管线归一,meta.errata;
+//     逐行拆分 8 例自 v2.0 = 提案 003 收编承入)
 //     管线 = graph → canvas.FromGraph → Paginator.Paginate → 页 graph 列表
 //   - corpus/flow-semantics/v1.1/flow.json(flow-semantics v1.1,23 用例,v1.1 增软诊断面:
 //     expect.warnings 序列比对 = code + path + 序列序,工票 05)
@@ -32,6 +34,7 @@ var corpusErrorCodes = map[string]error{
 	"content_overflow":            paginate.ErrContentOverflow,
 	"paginate_target_invalid":     paginate.ErrPaginateTargetInvalid,
 	"page_geometry_invalid":       paginate.ErrPageGeometryInvalid,
+	"paginate_option_invalid":     paginate.ErrPaginateOptionInvalid,
 	"flow_chain_invalid":          paginate.ErrFlowChainInvalid,
 	"flow_rows_path_inconsistent": paginate.ErrFlowRowsPathInconsistent,
 }
@@ -164,7 +167,7 @@ func TestPaginateSemanticsFixtures(t *testing.T) {
 		} `json:"cases"`
 	}
 	// 契约版本互检在 loadCorpus 内单点完成,此处不再重复断言
-	if err := json.Unmarshal(loadCorpus(t, "paginate-semantics/v1.0/paginate.json", corpus.ContractPaginate), &doc); err != nil {
+	if err := json.Unmarshal(loadCorpus(t, "paginate-semantics/v2.1/paginate.json", corpus.ContractPaginate), &doc); err != nil {
 		t.Fatalf("解码语料: %v", err)
 	}
 
@@ -188,7 +191,7 @@ func TestPaginateSemanticsFixtures(t *testing.T) {
 			green++
 		}
 	}
-	t.Logf("paginate-semantics v1.0:%d 用例,%d 绿 / %d 红", len(doc.Cases), green, len(doc.Cases)-green)
+	t.Logf("paginate-semantics v2.1:%d 用例,%d 绿 / %d 红", len(doc.Cases), green, len(doc.Cases)-green)
 }
 
 func TestFlowSemanticsFixtures(t *testing.T) {
