@@ -6,7 +6,7 @@
 
 - 根需求是**双端互通**：同一份 graph JSON 两端都能渲染，布局级一致（断行行数、行内容、图层坐标），像素不求等。
 - v1 **严格对等** PHP 已有能力：圆角、透明度、混合模式、阴影一律不做，另立项。
-- 表达式引擎 v2 已落地（工票 12，spec `../.scratch/table-layer-v2/spec.md`）：`hydrate/` 包承载求值器注入缝 + 默认受限插值实现与模板表数据填充步骤；wire 面三内容层 `SetExpression` 载体 + TableLayer 模板态条件写键，与 PHP 字节面兼容。三端语义一致性由共享 fixture 锁定（`hydrate/testdata/`，PHP 导出）。
+- 表达式引擎 v2 已落地（工票 12，spec `../.scratch/table-layer-v2/spec.md`）：`hydrate/` 包承载求值器注入缝 + 默认受限插值实现与模板表数据填充步骤；wire 面三内容层 `SetExpression` 载体 + TableLayer 模板态条件写键，与 PHP 字节面兼容。三端语义一致性由语料仓 `canvas-semantics` 语料锁定（submodule pin 消费，runner 直接读 `canvas-semantics/corpus/`；原 `hydrate/testdata/` 共享 fixture 轨已迁入语料仓）。
 
 ## 仓库与模块
 

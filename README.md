@@ -1,6 +1,6 @@
 # go-canvas
 
-[`php-canvas-next`](https://github.com/HankChenCH/php-canvas-next) 的 Go 移植：与 PHP 权威端共享同一 graph wire 契约与领域语言（`layer.Node` 逐字段键级对齐 PHP 各图层 `graph()` 产物），同一份 graph JSON 双端互读、布局级一致。
+[`php-canvas-next`](https://github.com/HankChenCH/php-canvas-next) 的 Go 移植：领域契约从语料仓 [`canvas-semantics`](https://github.com/HankChenCH/canvas-semantics) 定义（表达式求值/扫描、hydrate 填充、flow 流装箱、paginate 分页，语料先行，PHP/Go/TS 三端平等消费同一批语料用例）；graph wire 字节面仍以 PHP 权威端为锚，`layer.Node` 键级对齐 PHP 各图层 `graph()` 产物，同一份 graph JSON 双端互读、布局级一致。
 
 ## 模块结构
 
