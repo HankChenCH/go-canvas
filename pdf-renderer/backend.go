@@ -46,8 +46,11 @@ type Renderer struct {
 }
 
 // 编译期全量契约断言:直接对 renderer.Backend 断言,五个绘制原语签名齐备才算
-// 实现(匿名接口只点名三方法,DrawImage/DrawText 的签名漂移会漏检)
+// 实现(匿名接口只点名三方法,DrawImage/DrawText 的签名漂移会漏检);
+// 形状能力口断言锁定两原语(ADR 0026)——掩码 blit 走矢量裁剪、椭圆走原生
+// Ellipse,未实现即对 clip 声明降级矩形
 var _ renderer.Backend = (*Renderer)(nil)
+var _ renderer.ShapeCapableBackend = (*Renderer)(nil)
 
 // New 构造 PDF 渲染后端(不带默认物化器;经 NewRenderer 组装即完整管线)
 func New() *Renderer { return &Renderer{} }
